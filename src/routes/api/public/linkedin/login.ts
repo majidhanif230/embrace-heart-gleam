@@ -35,9 +35,9 @@ export const Route = createFileRoute("/api/public/linkedin/login")({
   },
 });
 
-function getLinkedInRedirectUri(requestUrl: string) {
+function getLinkedInRedirectUri(requestUrl: URL) {
   return (
     process.env.LINKEDIN_REDIRECT_URI ||
-    `${new URL(requestUrl).origin}/api/public/linkedin/callback`
+    `${requestUrl.origin}/api/public/linkedin/callback`
   );
 }
