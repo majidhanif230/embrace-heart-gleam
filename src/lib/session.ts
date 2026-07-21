@@ -1,5 +1,4 @@
 import { createMiddleware } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 
 export type LapSession = { userId?: string; oauthState?: string };
 
@@ -22,6 +21,7 @@ export function sessionConfig() {
 }
 
 export async function readSession() {
+  const { useSession } = await import("@tanstack/react-start/server");
   return useSession<LapSession>(sessionConfig());
 }
 
