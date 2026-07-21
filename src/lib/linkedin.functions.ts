@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateText } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLinkedInSession } from "./session.server";
 
 // Convert ASCII letters/digits inside **...** spans into Unicode
 // Mathematical Sans-Serif Bold characters (matches "𝗹𝗶𝗸𝗲 𝘁𝗵𝗶𝘀").
@@ -347,7 +347,7 @@ Rules: no text or typography in the image, no logos, no watermarks, no faces of 
   });
 
 export const publishPost = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -358,10 +358,17 @@ export const publishPost = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { publishToLinkedIn } = await import("./linkedin-publish.server");
-    const { postId } = await publishToLinkedIn({ text: data.text, images: data.images });
+    const { publishToLinkedIn, getUserTokens } = await import("./linkedin-publish.server");
+    const { accessToken, linkedinSub } = await getUserTokens(context.userId);
+    const { postId } = await publishToLinkedIn({
+      text: data.text,
+      images: data.images,
+      accessToken,
+      linkedinSub,
+    });
     if (data.draftId) {
-      await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
         .from("drafts")
         .update({
           status: "published",

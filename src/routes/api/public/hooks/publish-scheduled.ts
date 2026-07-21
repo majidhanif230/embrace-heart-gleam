@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { publishToLinkedIn } from "@/lib/linkedin-publish.server";
+import { publishToLinkedIn, getUserTokens } from "@/lib/linkedin-publish.server";
 
 // Cron endpoint: invoked every minute by pg_cron to publish due scheduled posts.
 // Uses the shared LinkedIn connector account.
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/public/hooks/publish-scheduled")({
 
         const { data: due, error } = await supabaseAdmin
           .from("drafts")
-          .select("id, content, image_data_base64, image_mime, image_filename")
+          .select("id, user_id, content, image_data_base64, image_mime, image_filename")
           .eq("status", "scheduled")
           .lte("scheduled_for", nowIso)
           .limit(20);
@@ -34,7 +34,13 @@ export const Route = createFileRoute("/api/public/hooks/publish-scheduled")({
                   dataBase64: draft.image_data_base64,
                 }]
               : [];
-            const { postId } = await publishToLinkedIn({ text: draft.content, images });
+            const { accessToken, linkedinSub } = await getUserTokens(draft.user_id);
+            const { postId } = await publishToLinkedIn({
+              text: draft.content,
+              images,
+              accessToken,
+              linkedinSub,
+            });
             await supabaseAdmin
               .from("drafts")
               .update({
