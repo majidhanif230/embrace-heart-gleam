@@ -385,6 +385,9 @@ function StatusLine({ status }: { status: Status }) {
   if (status.kind === "publishing") {
     return <p className="text-sm text-muted-foreground">Publishing to LinkedIn…</p>;
   }
+  if (status.kind === "generating-image") {
+    return <p className="text-sm text-muted-foreground">Generating image…</p>;
+  }
   if (status.kind === "success") {
     return (
       <p className="text-sm">
