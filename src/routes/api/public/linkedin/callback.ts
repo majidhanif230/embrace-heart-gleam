@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/public/linkedin/callback")({
           return redirectTo("/auth?error=not_configured");
         }
 
-        const redirectUri = `${reqUrl.origin}/api/public/linkedin/callback`;
+        const redirectUri = getLinkedInRedirectUri(reqUrl);
 
         // 1. Exchange code for access token
         const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
@@ -119,4 +119,11 @@ function redirectTo(path: string) {
     status: 302,
     headers: { Location: path },
   });
+}
+
+function getLinkedInRedirectUri(requestUrl: URL) {
+  return (
+    process.env.LINKEDIN_REDIRECT_URI ||
+    `${requestUrl.origin}/api/public/linkedin/callback`
+  );
 }

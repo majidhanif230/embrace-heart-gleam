@@ -13,7 +13,7 @@ export const Route = createFileRoute("/api/public/linkedin/login")({
           return new Response("LINKEDIN_CLIENT_ID not configured", { status: 500 });
         }
         const reqUrl = getRequestUrl();
-        const redirectUri = `${new URL(reqUrl).origin}/api/public/linkedin/callback`;
+        const redirectUri = getLinkedInRedirectUri(reqUrl);
 
         const state = crypto.randomUUID();
         const session = await readSession();
@@ -34,3 +34,10 @@ export const Route = createFileRoute("/api/public/linkedin/login")({
     },
   },
 });
+
+function getLinkedInRedirectUri(requestUrl: URL) {
+  return (
+    process.env.LINKEDIN_REDIRECT_URI ||
+    `${requestUrl.origin}/api/public/linkedin/callback`
+  );
+}
