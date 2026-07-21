@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as ApiPublicLinkedinLogoutRouteImport } from './routes/api/public/linkedin/logout'
+import { Route as ApiPublicLinkedinLoginRouteImport } from './routes/api/public/linkedin/login'
+import { Route as ApiPublicLinkedinCallbackRouteImport } from './routes/api/public/linkedin/callback'
 import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
 
 const AuthRoute = AuthRouteImport.update({
@@ -28,6 +31,22 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicLinkedinLogoutRoute = ApiPublicLinkedinLogoutRouteImport.update({
+  id: '/api/public/linkedin/logout',
+  path: '/api/public/linkedin/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicLinkedinLoginRoute = ApiPublicLinkedinLoginRouteImport.update({
+  id: '/api/public/linkedin/login',
+  path: '/api/public/linkedin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicLinkedinCallbackRoute =
+  ApiPublicLinkedinCallbackRouteImport.update({
+    id: '/api/public/linkedin/callback',
+    path: '/api/public/linkedin/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPublishScheduledRoute =
   ApiPublicHooksPublishScheduledRouteImport.update({
     id: '/api/public/hooks/publish-scheduled',
@@ -39,11 +58,17 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
+  '/api/public/linkedin/callback': typeof ApiPublicLinkedinCallbackRoute
+  '/api/public/linkedin/login': typeof ApiPublicLinkedinLoginRoute
+  '/api/public/linkedin/logout': typeof ApiPublicLinkedinLogoutRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/': typeof AuthenticatedIndexRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
+  '/api/public/linkedin/callback': typeof ApiPublicLinkedinCallbackRoute
+  '/api/public/linkedin/login': typeof ApiPublicLinkedinLoginRoute
+  '/api/public/linkedin/logout': typeof ApiPublicLinkedinLogoutRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -51,24 +76,45 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
+  '/api/public/linkedin/callback': typeof ApiPublicLinkedinCallbackRoute
+  '/api/public/linkedin/login': typeof ApiPublicLinkedinLoginRoute
+  '/api/public/linkedin/logout': typeof ApiPublicLinkedinLogoutRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/api/public/hooks/publish-scheduled'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/api/public/hooks/publish-scheduled'
+    | '/api/public/linkedin/callback'
+    | '/api/public/linkedin/login'
+    | '/api/public/linkedin/logout'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/' | '/api/public/hooks/publish-scheduled'
+  to:
+    | '/auth'
+    | '/'
+    | '/api/public/hooks/publish-scheduled'
+    | '/api/public/linkedin/callback'
+    | '/api/public/linkedin/login'
+    | '/api/public/linkedin/logout'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/'
     | '/api/public/hooks/publish-scheduled'
+    | '/api/public/linkedin/callback'
+    | '/api/public/linkedin/login'
+    | '/api/public/linkedin/logout'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiPublicHooksPublishScheduledRoute: typeof ApiPublicHooksPublishScheduledRoute
+  ApiPublicLinkedinCallbackRoute: typeof ApiPublicLinkedinCallbackRoute
+  ApiPublicLinkedinLoginRoute: typeof ApiPublicLinkedinLoginRoute
+  ApiPublicLinkedinLogoutRoute: typeof ApiPublicLinkedinLogoutRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -93,6 +139,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/linkedin/logout': {
+      id: '/api/public/linkedin/logout'
+      path: '/api/public/linkedin/logout'
+      fullPath: '/api/public/linkedin/logout'
+      preLoaderRoute: typeof ApiPublicLinkedinLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/linkedin/login': {
+      id: '/api/public/linkedin/login'
+      path: '/api/public/linkedin/login'
+      fullPath: '/api/public/linkedin/login'
+      preLoaderRoute: typeof ApiPublicLinkedinLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/linkedin/callback': {
+      id: '/api/public/linkedin/callback'
+      path: '/api/public/linkedin/callback'
+      fullPath: '/api/public/linkedin/callback'
+      preLoaderRoute: typeof ApiPublicLinkedinCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/publish-scheduled': {
       id: '/api/public/hooks/publish-scheduled'
@@ -119,6 +186,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiPublicHooksPublishScheduledRoute: ApiPublicHooksPublishScheduledRoute,
+  ApiPublicLinkedinCallbackRoute: ApiPublicLinkedinCallbackRoute,
+  ApiPublicLinkedinLoginRoute: ApiPublicLinkedinLoginRoute,
+  ApiPublicLinkedinLogoutRoute: ApiPublicLinkedinLogoutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

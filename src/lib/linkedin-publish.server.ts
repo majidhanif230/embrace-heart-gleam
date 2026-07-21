@@ -1,17 +1,21 @@
-// Server-only helper that publishes to the linked LinkedIn account.
-// Shared between the user's `publishPost` server fn and the pg_cron scheduled endpoint.
+// Server-only helper that publishes to a specific user's LinkedIn account
+// using their own OAuth access token (per-user auth).
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/linkedin";
+const LI_API = "https://api.linkedin.com";
 
-function headers() {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const linkedinKey = process.env.LINKEDIN_API_KEY;
-  if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
-  if (!linkedinKey) throw new Error("LINKEDIN_API_KEY is not configured");
-  return {
-    Authorization: `Bearer ${lovableKey}`,
-    "X-Connection-Api-Key": linkedinKey,
-  };
+export async function getUserTokens(userId: string): Promise<{ accessToken: string; linkedinSub: string }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("linkedin_users")
+    .select("access_token, linkedin_sub, expires_at")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`Failed to load LinkedIn user: ${error.message}`);
+  if (!data) throw new Error("LinkedIn account not connected");
+  if (new Date(data.expires_at).getTime() < Date.now()) {
+    throw new Error("Your LinkedIn session expired. Please sign in again.");
+  }
+  return { accessToken: data.access_token, linkedinSub: data.linkedin_sub };
 }
 
 export type PublishImage = {
@@ -23,20 +27,15 @@ export type PublishImage = {
 export async function publishToLinkedIn(opts: {
   text: string;
   images: PublishImage[];
+  accessToken: string;
+  linkedinSub: string;
 }): Promise<{ postId?: string }> {
-  const h = headers();
-
-  const userinfoRes = await fetch(`${GATEWAY_URL}/v2/userinfo`, { headers: h });
-  if (!userinfoRes.ok) {
-    throw new Error(`LinkedIn userinfo failed [${userinfoRes.status}]: ${await userinfoRes.text()}`);
-  }
-  const userinfo = (await userinfoRes.json()) as { sub?: string };
-  if (!userinfo.sub) throw new Error("LinkedIn userinfo missing 'sub'");
-  const authorUrn = `urn:li:person:${userinfo.sub}`;
+  const h = { Authorization: `Bearer ${opts.accessToken}` };
+  const authorUrn = `urn:li:person:${opts.linkedinSub}`;
 
   const assetUrns: string[] = [];
   for (const img of opts.images) {
-    const regRes = await fetch(`${GATEWAY_URL}/v2/assets?action=registerUpload`, {
+    const regRes = await fetch(`${LI_API}/v2/assets?action=registerUpload`, {
       method: "POST",
       headers: { ...h, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,7 +61,7 @@ export async function publishToLinkedIn(opts: {
     const binary = Uint8Array.from(atob(img.dataBase64), (c) => c.charCodeAt(0));
     const upRes = await fetch(uploadUrl, {
       method: "PUT",
-      headers: { "Content-Type": img.mimeType },
+      headers: { "Content-Type": img.mimeType, Authorization: `Bearer ${opts.accessToken}` },
       body: binary,
     });
     if (!upRes.ok) throw new Error(`LinkedIn image upload failed [${upRes.status}]: ${await upRes.text().catch(() => "")}`);
@@ -83,7 +82,7 @@ export async function publishToLinkedIn(opts: {
     visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
   };
 
-  const postRes = await fetch(`${GATEWAY_URL}/v2/ugcPosts`, {
+  const postRes = await fetch(`${LI_API}/v2/ugcPosts`, {
     method: "POST",
     headers: { ...h, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
     body: JSON.stringify(payload),
