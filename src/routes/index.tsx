@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { generatePost, publishPost } from "@/lib/linkedin.functions";
+import { generatePost, publishPost, generateImage } from "@/lib/linkedin.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,6 +19,7 @@ export const Route = createFileRoute("/")({
 type Status =
   | { kind: "idle" }
   | { kind: "generating" }
+  | { kind: "generating-image" }
   | { kind: "ready" }
   | { kind: "publishing" }
   | { kind: "success"; postId?: string }
@@ -40,9 +41,9 @@ type PendingImage = {
   previewUrl: string;
 };
 
-const MAX_IMAGES = 9;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB per image
 const TRUNCATION_LIMIT = 210;
+const MAX_POST_CHARS = 3000;
 
 async function fileToPendingImage(file: File): Promise<PendingImage> {
   const buf = await file.arrayBuffer();
@@ -59,27 +60,59 @@ async function fileToPendingImage(file: File): Promise<PendingImage> {
   };
 }
 
+function base64ToPreviewUrl(base64: string, mimeType: string): string {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+}
+
+// Trim to MAX_POST_CHARS while preserving the hook (first line) and hashtags (last line).
+function trimToMax(text: string): string {
+  if (text.length <= MAX_POST_CHARS) return text;
+  const lines = text.split("\n");
+  const hook = lines[0] ?? "";
+  // Find hashtag line (last non-empty line starting with #)
+  let tagIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i].trim();
+    if (l && l.startsWith("#")) { tagIdx = i; break; }
+    if (l) break;
+  }
+  const tags = tagIdx >= 0 ? lines[tagIdx] : "";
+  const bodyLines = lines.slice(1, tagIdx >= 0 ? tagIdx : lines.length);
+  const suffix = tags ? `\n\n${tags}` : "";
+  const prefix = `${hook}\n\n`;
+  const budget = MAX_POST_CHARS - prefix.length - suffix.length;
+  let body = bodyLines.join("\n").trim();
+  if (body.length > budget) body = body.slice(0, Math.max(0, budget - 1)).trimEnd() + "…";
+  return `${prefix}${body}${suffix}`;
+}
+
 function Index() {
   const [topic, setTopic] = useState("");
   const [goal, setGoal] = useState<Goal>("thought-leadership");
   const [post, setPost] = useState("");
-  const [images, setImages] = useState<PendingImage[]>([]);
+  const [image, setImage] = useState<PendingImage | null>(null);
+  const [imageMode, setImageMode] = useState<"ai" | "upload">("ai");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isGenerating = status.kind === "generating";
+  const isGeneratingImage = status.kind === "generating-image";
   const isPublishing = status.kind === "publishing";
-  const busy = isGenerating || isPublishing;
+  const busy = isGenerating || isGeneratingImage || isPublishing;
 
   const charCount = post.length;
   const overFold = charCount > TRUNCATION_LIMIT;
+  const overMax = charCount > MAX_POST_CHARS;
 
   const onGenerate = async () => {
     if (!topic.trim()) return;
     setStatus({ kind: "generating" });
     try {
       const { text } = await generatePost({ data: { topic: topic.trim(), goal } });
-      setPost(text);
+      setPost(trimToMax(text));
       setStatus({ kind: "ready" });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed to generate post" });
@@ -88,16 +121,18 @@ function Index() {
 
   const onPublish = async () => {
     if (!post.trim()) return;
+    if (post.length > MAX_POST_CHARS) {
+      setStatus({ kind: "error", message: `Post exceeds ${MAX_POST_CHARS} characters. Trim it before publishing.` });
+      return;
+    }
     setStatus({ kind: "publishing" });
     try {
       const result = await publishPost({
         data: {
           text: post.trim(),
-          images: images.map(({ filename, mimeType, dataBase64 }) => ({
-            filename,
-            mimeType,
-            dataBase64,
-          })),
+          images: image
+            ? [{ filename: image.filename, mimeType: image.mimeType, dataBase64: image.dataBase64 }]
+            : [],
         },
       });
       setStatus({ kind: "success", postId: result.postId });
@@ -106,37 +141,49 @@ function Index() {
     }
   };
 
-  const onImagesSelected = async (files: FileList | null) => {
+  const onImageSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const room = MAX_IMAGES - images.length;
-    const picked = Array.from(files).slice(0, room);
-    const errors: string[] = [];
-    const accepted: File[] = [];
-    for (const file of picked) {
-      if (!/^image\/(png|jpeg|jpg|gif|webp)$/.test(file.type)) {
-        errors.push(`${file.name}: unsupported type`);
-        continue;
-      }
-      if (file.size > MAX_IMAGE_BYTES) {
-        errors.push(`${file.name}: over 8 MB`);
-        continue;
-      }
-      accepted.push(file);
+    const file = files[0];
+    if (!/^image\/(png|jpeg|jpg|gif|webp)$/.test(file.type)) {
+      setStatus({ kind: "error", message: `${file.name}: unsupported type` });
+      return;
     }
-    const added = await Promise.all(accepted.map(fileToPendingImage));
-    setImages((prev) => [...prev, ...added]);
+    if (file.size > MAX_IMAGE_BYTES) {
+      setStatus({ kind: "error", message: `${file.name}: over 8 MB` });
+      return;
+    }
+    const added = await fileToPendingImage(file);
+    if (image) URL.revokeObjectURL(image.previewUrl);
+    setImage(added);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (errors.length) {
-      setStatus({ kind: "error", message: errors.join("; ") });
-    }
   };
 
-  const removeImage = (id: string) => {
-    setImages((prev) => {
-      const target = prev.find((p) => p.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter((p) => p.id !== id);
-    });
+  const removeImage = () => {
+    if (image) URL.revokeObjectURL(image.previewUrl);
+    setImage(null);
+  };
+
+  const onGenerateImage = async () => {
+    if (!topic.trim()) {
+      setStatus({ kind: "error", message: "Enter a topic first to generate an image." });
+      return;
+    }
+    setStatus({ kind: "generating-image" });
+    try {
+      const res = await generateImage({ data: { topic: topic.trim() } });
+      if (image) URL.revokeObjectURL(image.previewUrl);
+      const previewUrl = base64ToPreviewUrl(res.dataBase64, res.mimeType);
+      setImage({
+        id: `ai-${Math.random().toString(36).slice(2)}`,
+        filename: res.filename,
+        mimeType: res.mimeType,
+        dataBase64: res.dataBase64,
+        previewUrl,
+      });
+      setStatus({ kind: post.trim() ? "ready" : "idle" });
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed to generate image" });
+    }
   };
 
   return (
@@ -223,46 +270,81 @@ function Index() {
                   ? `${charCount - TRUNCATION_LIMIT} chars after the "see more" cutoff`
                   : `${TRUNCATION_LIMIT - charCount} chars until the "see more" cutoff`}
               </span>
-              <span className="text-muted-foreground">{charCount} chars</span>
+              <span className={overMax ? "text-red-600 font-semibold" : "text-muted-foreground"}>
+                {charCount} / {MAX_POST_CHARS} characters
+              </span>
             </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Images{" "}
-              <span className="normal-case tracking-normal text-muted-foreground/70">
-                (optional · up to {MAX_IMAGES})
-              </span>
+          <div className="border-t border-border pt-8">
+            <label className="mb-3 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Image <span className="normal-case tracking-normal text-muted-foreground/70">(optional)</span>
             </label>
-            <div className="flex flex-wrap items-center gap-3">
-              {images.map((img) => (
-                <div key={img.id} className="relative h-20 w-20 overflow-hidden border border-border">
-                  <img src={img.previewUrl} alt={img.filename} className="h-full w-full object-cover" />
+            <div className="mb-4 inline-flex border border-border">
+              <button
+                type="button"
+                onClick={() => setImageMode("ai")}
+                disabled={busy}
+                className={`px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
+                  imageMode === "ai"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Generate with AI
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageMode("upload")}
+                disabled={busy}
+                className={`px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
+                  imageMode === "upload"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Upload
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-start gap-4">
+              {image && (
+                <div className="relative h-32 w-32 overflow-hidden border border-border">
+                  <img src={image.previewUrl} alt={image.filename} className="h-full w-full object-cover" />
                   <button
                     type="button"
-                    onClick={() => removeImage(img.id)}
+                    onClick={removeImage}
                     disabled={busy}
-                    aria-label={`Remove ${img.filename}`}
-                    className="absolute right-0 top-0 bg-background/90 px-1.5 py-0.5 text-xs text-foreground hover:text-accent"
+                    aria-label="Remove image"
+                    className="absolute right-0 top-0 bg-background/90 px-2 py-0.5 text-xs text-foreground hover:text-accent"
                   >
                     ×
                   </button>
                 </div>
-              ))}
-              {images.length < MAX_IMAGES && (
+              )}
+
+              {imageMode === "ai" ? (
+                <button
+                  type="button"
+                  onClick={onGenerateImage}
+                  disabled={busy || !topic.trim()}
+                  className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-foreground hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isGeneratingImage ? "Generating image…" : image ? "Regenerate image" : "Generate image with AI"}
+                </button>
+              ) : (
                 <label
-                  className={`flex h-20 w-20 cursor-pointer items-center justify-center border border-dashed border-border text-2xl text-muted-foreground hover:border-accent hover:text-accent ${
+                  className={`flex cursor-pointer items-center border border-dashed border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground hover:border-accent hover:text-accent ${
                     busy ? "pointer-events-none opacity-50" : ""
                   }`}
                 >
-                  +
+                  {image ? "Replace image" : "Choose file"}
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/png,image/jpeg,image/gif,image/webp"
-                    multiple
                     className="hidden"
-                    onChange={(e) => onImagesSelected(e.target.files)}
+                    onChange={(e) => onImageSelected(e.target.files)}
                     disabled={busy}
                   />
                 </label>
@@ -274,7 +356,7 @@ function Index() {
             <StatusLine status={status} />
             <button
               onClick={onPublish}
-              disabled={busy || !post.trim()}
+              disabled={busy || !post.trim() || overMax}
               className="whitespace-nowrap bg-accent px-6 py-3 text-sm font-medium uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isPublishing ? "Publishing…" : "Publish to LinkedIn"}
