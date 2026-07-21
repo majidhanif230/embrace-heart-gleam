@@ -44,6 +44,7 @@ type PendingImage = {
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB per image
 const TRUNCATION_LIMIT = 210;
 const MAX_POST_CHARS = 3000;
+const DEFAULT_TARGET_CHARS = 900;
 
 async function fileToPendingImage(file: File): Promise<PendingImage> {
   const buf = await file.arrayBuffer();
@@ -67,9 +68,9 @@ function base64ToPreviewUrl(base64: string, mimeType: string): string {
   return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
 }
 
-// Trim to MAX_POST_CHARS while preserving the hook (first line) and hashtags (last line).
-function trimToMax(text: string): string {
-  if (text.length <= MAX_POST_CHARS) return text;
+// Trim to `limit` chars while preserving the hook (first line) and hashtags (last line).
+function trimToMax(text: string, limit: number): string {
+  if (text.length <= limit) return text;
   const lines = text.split("\n");
   const hook = lines[0] ?? "";
   // Find hashtag line (last non-empty line starting with #)
@@ -83,7 +84,7 @@ function trimToMax(text: string): string {
   const bodyLines = lines.slice(1, tagIdx >= 0 ? tagIdx : lines.length);
   const suffix = tags ? `\n\n${tags}` : "";
   const prefix = `${hook}\n\n`;
-  const budget = MAX_POST_CHARS - prefix.length - suffix.length;
+  const budget = limit - prefix.length - suffix.length;
   let body = bodyLines.join("\n").trim();
   if (body.length > budget) body = body.slice(0, Math.max(0, budget - 1)).trimEnd() + "…";
   return `${prefix}${body}${suffix}`;
@@ -95,6 +96,7 @@ function Index() {
   const [post, setPost] = useState("");
   const [image, setImage] = useState<PendingImage | null>(null);
   const [imageMode, setImageMode] = useState<"ai" | "upload">("ai");
+  const [targetChars, setTargetChars] = useState<number>(DEFAULT_TARGET_CHARS);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,13 +108,14 @@ function Index() {
   const charCount = post.length;
   const overFold = charCount > TRUNCATION_LIMIT;
   const overMax = charCount > MAX_POST_CHARS;
+  const overTarget = charCount > targetChars;
 
   const onGenerate = async () => {
     if (!topic.trim()) return;
     setStatus({ kind: "generating" });
     try {
-      const { text } = await generatePost({ data: { topic: topic.trim(), goal } });
-      setPost(trimToMax(text));
+      const { text } = await generatePost({ data: { topic: topic.trim(), goal, targetChars } });
+      setPost(trimToMax(text, targetChars));
       setStatus({ kind: "ready" });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed to generate post" });
