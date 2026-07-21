@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { readSession } from "./session.server";
+import { readSession } from "./session";
 
 export type SessionUser = {
   id: string;
