@@ -89,6 +89,35 @@ const MediaSchema = z.object({
   dataBase64: z.string().min(1),
 });
 
+export const generateImage = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ topic: z.string().min(1).max(500) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+    const prompt = `Professional, clean, editorial-style image representing: ${data.topic}. Minimal composition, sophisticated lighting, no text overlay, suitable for LinkedIn.`;
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-image-2",
+        prompt,
+        quality: "low",
+        size: "1024x1024",
+        n: 1,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Image generation failed [${res.status}]: ${body}`);
+    }
+    const json = (await res.json()) as { data?: Array<{ b64_json?: string }> };
+    const b64 = json.data?.[0]?.b64_json;
+    if (!b64) throw new Error("Image generation returned no image data");
+    return { dataBase64: b64, mimeType: "image/png" as const, filename: "ai-generated.png" };
+  });
+
 export const publishPost = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
