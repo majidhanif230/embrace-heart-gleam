@@ -26,7 +26,7 @@ export const updateProfile = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, string> = {};
+    const patch: { display_name?: string; voice_notes?: string } = {};
     if (data.display_name !== undefined) patch.display_name = data.display_name;
     if (data.voice_notes !== undefined) patch.voice_notes = data.voice_notes;
     const { error } = await context.supabase
