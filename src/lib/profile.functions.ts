@@ -1,11 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLinkedInSession } from "./session.server";
 import { z } from "zod";
 
+async function admin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
 export const getProfile = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const db = await admin();
+    const { data, error } = await db
       .from("profiles")
       .select("display_name, voice_notes")
       .eq("user_id", context.userId)
@@ -18,7 +24,7 @@ export const getProfile = createServerFn({ method: "GET" })
   });
 
 export const updateProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .inputValidator((input: unknown) =>
     z.object({
       display_name: z.string().max(200).optional(),
@@ -26,13 +32,14 @@ export const updateProfile = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    const db = await admin();
     const patch: { display_name?: string; voice_notes?: string } = {};
     if (data.display_name !== undefined) patch.display_name = data.display_name;
     if (data.voice_notes !== undefined) patch.voice_notes = data.voice_notes;
-    const { error } = await context.supabase
+    // Upsert so first-time users without a profile row still succeed.
+    const { error } = await db
       .from("profiles")
-      .update(patch)
-      .eq("user_id", context.userId);
+      .upsert({ user_id: context.userId, ...patch }, { onConflict: "user_id" });
     if (error) throw new Error(error.message);
     return { ok: true as const };
   });

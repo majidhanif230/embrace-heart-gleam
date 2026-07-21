@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLinkedInSession } from "./session.server";
 import { z } from "zod";
+
+async function admin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 const DraftInput = z.object({
   id: z.string().uuid().optional(),
@@ -14,9 +19,10 @@ const DraftInput = z.object({
 });
 
 export const listDrafts = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const db = await admin();
+    const { data, error } = await db
       .from("drafts")
       .select("id, topic, style, target_chars, content, image_filename, status, scheduled_for, published_at, post_id, error_message, updated_at")
       .eq("user_id", context.userId)
@@ -27,9 +33,10 @@ export const listDrafts = createServerFn({ method: "GET" })
   });
 
 export const upsertDraft = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .inputValidator((input: unknown) => DraftInput.parse(input))
   .handler(async ({ data, context }) => {
+    const db = await admin();
     const row = {
       user_id: context.userId,
       topic: data.topic,
@@ -42,7 +49,7 @@ export const upsertDraft = createServerFn({ method: "POST" })
       status: "draft" as const,
     };
     if (data.id) {
-      const { data: updated, error } = await context.supabase
+      const { data: updated, error } = await db
         .from("drafts")
         .update(row)
         .eq("id", data.id)
@@ -52,7 +59,7 @@ export const upsertDraft = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: updated.id };
     }
-    const { data: inserted, error } = await context.supabase
+    const { data: inserted, error } = await db
       .from("drafts")
       .insert(row)
       .select("id")
@@ -62,10 +69,11 @@ export const upsertDraft = createServerFn({ method: "POST" })
   });
 
 export const deleteDraft = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const db = await admin();
+    const { error } = await db
       .from("drafts")
       .delete()
       .eq("id", data.id)
@@ -75,11 +83,12 @@ export const deleteDraft = createServerFn({ method: "POST" })
   });
 
 export const scheduleDraft = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .inputValidator((input: unknown) =>
     DraftInput.extend({ scheduled_for: z.string().datetime() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    const db = await admin();
     const scheduledDate = new Date(data.scheduled_for);
     if (scheduledDate.getTime() < Date.now() - 60_000) {
       throw new Error("Scheduled time must be in the future.");
@@ -98,7 +107,7 @@ export const scheduleDraft = createServerFn({ method: "POST" })
       error_message: null,
     };
     if (data.id) {
-      const { data: updated, error } = await context.supabase
+      const { data: updated, error } = await db
         .from("drafts")
         .update(row)
         .eq("id", data.id)
@@ -108,7 +117,7 @@ export const scheduleDraft = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: updated.id };
     }
-    const { data: inserted, error } = await context.supabase
+    const { data: inserted, error } = await db
       .from("drafts")
       .insert(row)
       .select("id")
@@ -118,10 +127,11 @@ export const scheduleDraft = createServerFn({ method: "POST" })
   });
 
 export const cancelSchedule = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLinkedInSession])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const db = await admin();
+    const { error } = await db
       .from("drafts")
       .update({ status: "draft", scheduled_for: null })
       .eq("id", data.id)

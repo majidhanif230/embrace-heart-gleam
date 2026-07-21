@@ -1,6 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import {
   generatePostVariants,
   generateHooks,
@@ -20,6 +19,7 @@ import {
   scheduleDraft,
   cancelSchedule,
 } from "@/lib/drafts.functions";
+import { getSessionUser } from "@/lib/linkedin-auth.functions";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -174,8 +174,7 @@ function trimToMax(text: string, limit: number): string {
 }
 
 function Studio() {
-  const navigate = useNavigate();
-  const [userEmail, setUserEmail] = useState<string>("");
+  const [userLabel, setUserLabel] = useState<string>("");
   const [voiceNotes, setVoiceNotes] = useState("");
   const [voiceOpen, setVoiceOpen] = useState(false);
 
@@ -203,7 +202,7 @@ function Studio() {
   const busy = status.kind !== "idle" && status.kind !== "ready" && status.kind !== "success" && status.kind !== "error";
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ""));
+    getSessionUser().then((u) => setUserLabel(u?.name || u?.email || "")).catch(() => {});
     getProfile().then((p) => setVoiceNotes(p.voice_notes ?? "")).catch(() => {});
     refreshDrafts();
   }, []);
@@ -217,9 +216,8 @@ function Studio() {
   const overMax = charCount > MAX_POST_CHARS;
   const overTarget = charCount > targetChars;
 
-  const onSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate({ to: "/auth" });
+  const onSignOut = () => {
+    window.location.href = "/api/public/linkedin/logout";
   };
 
   const saveVoice = async () => {
@@ -436,7 +434,7 @@ function Studio() {
             <button onClick={onNewDraft} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
               New
             </button>
-            <span className="hidden text-muted-foreground sm:inline">{userEmail}</span>
+            <span className="hidden text-muted-foreground sm:inline">{userLabel}</span>
             <button onClick={onSignOut} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
               Sign out
             </button>
