@@ -244,6 +244,30 @@ function Index() {
           </div>
 
           <div>
+            <label htmlFor="targetChars" className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              <span>Target length</span>
+              <span className="normal-case tracking-normal text-foreground">
+                {targetChars} characters
+              </span>
+            </label>
+            <input
+              id="targetChars"
+              type="range"
+              min={200}
+              max={3000}
+              step={50}
+              value={targetChars}
+              onChange={(e) => setTargetChars(Number(e.target.value))}
+              disabled={busy}
+              className="w-full accent-accent disabled:opacity-50"
+            />
+            <div className="mt-1 flex justify-between text-[10px] uppercase tracking-widest text-muted-foreground/70">
+              <span>Short · 200</span>
+              <span>Long · 3000</span>
+            </div>
+          </div>
+
+          <div>
             <button
               onClick={onGenerate}
               disabled={busy || !topic.trim()}
@@ -273,8 +297,9 @@ function Index() {
                   ? `${charCount - TRUNCATION_LIMIT} chars after the "see more" cutoff`
                   : `${TRUNCATION_LIMIT - charCount} chars until the "see more" cutoff`}
               </span>
-              <span className={overMax ? "text-red-600 font-semibold" : "text-muted-foreground"}>
-                {charCount} / {MAX_POST_CHARS} characters
+              <span className={overMax ? "text-red-600 font-semibold" : overTarget ? "text-accent" : "text-muted-foreground"}>
+                {charCount} / {targetChars} characters
+                {overMax ? ` · over ${MAX_POST_CHARS} limit` : ""}
               </span>
             </div>
           </div>
