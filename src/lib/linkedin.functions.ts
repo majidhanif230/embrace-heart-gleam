@@ -2,19 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateText } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
-
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/linkedin";
-
-function linkedInHeaders() {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const linkedinKey = process.env.LINKEDIN_API_KEY;
-  if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
-  if (!linkedinKey) throw new Error("LINKEDIN_API_KEY is not configured");
-  return {
-    Authorization: `Bearer ${lovableKey}`,
-    "X-Connection-Api-Key": linkedinKey,
-  };
-}
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // Convert ASCII letters/digits inside **...** spans into Unicode
 // Mathematical Sans-Serif Bold characters (matches "𝗹𝗶𝗸𝗲 𝘁𝗵𝗶𝘀").
@@ -359,116 +347,30 @@ Rules: no text or typography in the image, no logos, no watermarks, no faces of 
   });
 
 export const publishPost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
         text: z.string().min(1).max(3000),
         images: z.array(MediaSchema).max(9).optional().default([]),
+        draftId: z.string().uuid().optional(),
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
-    const headers = linkedInHeaders();
-
-    // Get the connected member's URN via OIDC userinfo
-    const userinfoRes = await fetch(`${GATEWAY_URL}/v2/userinfo`, { headers });
-    if (!userinfoRes.ok) {
-      const body = await userinfoRes.text();
-      throw new Error(`LinkedIn userinfo failed [${userinfoRes.status}]: ${body}`);
+  .handler(async ({ data, context }) => {
+    const { publishToLinkedIn } = await import("./linkedin-publish.server");
+    const { postId } = await publishToLinkedIn({ text: data.text, images: data.images });
+    if (data.draftId) {
+      await context.supabase
+        .from("drafts")
+        .update({
+          status: "published",
+          published_at: new Date().toISOString(),
+          post_id: postId ?? null,
+          error_message: null,
+        })
+        .eq("id", data.draftId)
+        .eq("user_id", context.userId);
     }
-    const userinfo = (await userinfoRes.json()) as { sub?: string };
-    if (!userinfo.sub) throw new Error("LinkedIn userinfo missing 'sub'");
-    const authorUrn = `urn:li:person:${userinfo.sub}`;
-
-    // Upload each image to LinkedIn's asset service and collect the asset URNs.
-    const assetUrns: string[] = [];
-    for (const img of data.images) {
-      const registerRes = await fetch(`${GATEWAY_URL}/v2/assets?action=registerUpload`, {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          registerUploadRequest: {
-            recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
-            owner: authorUrn,
-            serviceRelationships: [
-              { relationshipType: "OWNER", identifier: "urn:li:userGeneratedContent" },
-            ],
-          },
-        }),
-      });
-      if (!registerRes.ok) {
-        const body = await registerRes.text();
-        throw new Error(`LinkedIn registerUpload failed [${registerRes.status}]: ${body}`);
-      }
-      const registered = (await registerRes.json()) as {
-        value?: {
-          asset?: string;
-          uploadMechanism?: {
-            "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"?: {
-              uploadUrl?: string;
-            };
-          };
-        };
-      };
-      const uploadUrl =
-        registered.value?.uploadMechanism?.[
-          "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
-        ]?.uploadUrl;
-      const asset = registered.value?.asset;
-      if (!uploadUrl || !asset) throw new Error("LinkedIn registerUpload missing uploadUrl/asset");
-
-      const binary = Uint8Array.from(atob(img.dataBase64), (c) => c.charCodeAt(0));
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": img.mimeType },
-        body: binary,
-      });
-      if (!uploadRes.ok) {
-        const body = await uploadRes.text().catch(() => "");
-        throw new Error(`LinkedIn image upload failed [${uploadRes.status}]: ${body}`);
-      }
-      assetUrns.push(asset);
-    }
-
-    const hasMedia = assetUrns.length > 0;
-    const payload = {
-      author: authorUrn,
-      lifecycleState: "PUBLISHED",
-      specificContent: {
-        "com.linkedin.ugc.ShareContent": {
-          shareCommentary: { text: data.text },
-          shareMediaCategory: hasMedia ? "IMAGE" : "NONE",
-          ...(hasMedia
-            ? {
-                media: assetUrns.map((urn) => ({
-                  status: "READY",
-                  media: urn,
-                })),
-              }
-            : {}),
-        },
-      },
-      visibility: {
-        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
-      },
-    };
-
-    const postRes = await fetch(`${GATEWAY_URL}/v2/ugcPosts`, {
-      method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json",
-        "X-Restli-Protocol-Version": "2.0.0",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!postRes.ok) {
-      const body = await postRes.text();
-      console.error(`LinkedIn publish failed [${postRes.status}]: ${body}`);
-      throw new Error(`LinkedIn publish failed [${postRes.status}]: ${body}`);
-    }
-
-    const postId = postRes.headers.get("x-restli-id") ?? undefined;
     return { ok: true as const, postId };
   });
