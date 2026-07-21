@@ -71,6 +71,45 @@ export type Database = {
         }
         Relationships: []
       }
+      linkedin_users: {
+        Row: {
+          access_token: string
+          created_at: string
+          email: string | null
+          expires_at: string
+          id: string
+          linkedin_sub: string
+          name: string | null
+          picture: string | null
+          refresh_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          email?: string | null
+          expires_at: string
+          id?: string
+          linkedin_sub: string
+          name?: string | null
+          picture?: string | null
+          refresh_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          linkedin_sub?: string
+          name?: string | null
+          picture?: string | null
+          refresh_token?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
