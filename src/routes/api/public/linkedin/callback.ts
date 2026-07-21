@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestUrl } from "@tanstack/react-start/server";
-import { readSession } from "@/lib/session.server";
+import { readSession } from "@/lib/session";
 
 export const Route = createFileRoute("/api/public/linkedin/callback")({
   server: {

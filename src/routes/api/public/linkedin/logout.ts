@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { readSession } from "@/lib/session.server";
+import { readSession } from "@/lib/session";
 
 export const Route = createFileRoute("/api/public/linkedin/logout")({
   server: {

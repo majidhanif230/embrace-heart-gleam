@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateText } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
-import { requireLinkedInSession } from "./session.server";
+import { requireLinkedInSession } from "./session";
 
 // Convert ASCII letters/digits inside **...** spans into Unicode
 // Mathematical Sans-Serif Bold characters (matches "𝗹𝗶𝗸𝗲 𝘁𝗵𝗶𝘀").

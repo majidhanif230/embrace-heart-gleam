@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireLinkedInSession } from "./session.server";
+import { requireLinkedInSession } from "./session";
 import { z } from "zod";
 
 async function admin() {
