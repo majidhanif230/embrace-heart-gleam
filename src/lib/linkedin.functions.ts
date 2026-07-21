@@ -44,6 +44,7 @@ export const generatePost = createServerFn({ method: "POST" })
       .object({
         topic: z.string().min(1).max(500),
         goal: z.enum(["thought-leadership", "personal-story", "tips-insights", "announcement"]),
+        targetChars: z.number().int().min(200).max(3000).optional(),
       })
       .parse(input),
   )
@@ -53,10 +54,13 @@ export const generatePost = createServerFn({ method: "POST" })
     const gateway = createLovableAiGatewayProvider(key);
 
     const goalDescription = POST_GOALS[data.goal];
+    const target = data.targetChars ?? 900;
+    const minChars = Math.max(150, Math.round(target * 0.8));
     const prompt = `You are writing a LinkedIn post.
 
 GOAL: ${goalDescription}
 TOPIC: ${data.topic}
+TARGET LENGTH: aim for approximately ${target} characters (between ${minChars} and ${target}). NEVER exceed ${target} characters total.
 
 STRUCTURE (follow exactly):
 1. Line 1: a short, scroll-stopping hook — question, bold claim, or relatable problem. MUST be under 210 characters so it shows before the "see more" cutoff. Wrap the hook line in **double asterisks** so it becomes bold.
@@ -68,7 +72,7 @@ STRUCTURE (follow exactly):
 7. Last line: 3–5 niche, specific hashtags (mix 1 broad + 2–4 specific). Never generic (#motivation, #success, #inspiration).
 
 RULES:
-- Total length 150–300 words.
+- Total length must fit within ${target} characters. Adjust body paragraph count and length to hit the target.
 - No external links.
 - Use **double asterisks** for bold — do NOT output any other markdown. The renderer converts ** to Unicode bold.
 - Use single line breaks between short paragraphs, matching how LinkedIn renders them.
