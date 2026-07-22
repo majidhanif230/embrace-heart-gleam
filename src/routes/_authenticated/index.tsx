@@ -546,33 +546,46 @@ function Studio() {
   const publishedDrafts = drafts.filter((d) => d.status === "published" || d.status === "failed");
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen text-foreground">
       {/* Top bar */}
-      <div className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3 text-xs">
-          <p className="font-serif text-base font-semibold">LinkedIn Auto Poster</p>
-          <div className="flex items-center gap-4">
-            <button onClick={() => setVoiceOpen(true)} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
+      <header className="sticky top-0 z-40 glass-strong border-b border-border/60">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl gradient-viral font-bold text-white shadow-lg shadow-primary/30">L</span>
+            <div className="min-w-0">
+              <p className="truncate font-serif text-base font-bold tracking-tight">
+                LinkedIn <span className="text-gradient">Auto Poster</span>
+              </p>
+              <p className="hidden text-[10px] uppercase tracking-widest text-muted-foreground sm:block">AI content studio</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2 text-xs">
+            <button onClick={() => setVoiceOpen(true)} className="rounded-lg px-3 py-1.5 font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground">
               Voice
             </button>
-            <button onClick={() => setKnowledgeOpen(true)} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
-              Knowledge{knowledge.length ? ` · ${knowledge.length}` : ""}
+            <button onClick={() => setKnowledgeOpen(true)} className="rounded-lg px-3 py-1.5 font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground">
+              Knowledge{knowledge.length ? <span className="ml-1 rounded-full gradient-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{knowledge.length}</span> : ""}
             </button>
-            <button onClick={onNewDraft} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
-              New
+            <button onClick={onNewDraft} className="rounded-lg px-3 py-1.5 font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground">
+              + New
             </button>
-            <span className="hidden text-muted-foreground sm:inline">{userLabel}</span>
-            <button onClick={onSignOut} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
+            <span className="hidden max-w-[140px] truncate text-muted-foreground md:inline">{userLabel}</span>
+            <button onClick={onSignOut} className="rounded-lg border border-border/60 px-3 py-1.5 font-medium text-muted-foreground transition hover:border-destructive/60 hover:text-destructive">
               Sign out
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* MAIN */}
           <section className="space-y-8">
+            <div className="glass rounded-3xl p-6 sm:p-8">
+              <div className="mb-6 flex items-center gap-2">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">Studio</p>
+              </div>
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <Label htmlFor="topic">Topic</Label>
@@ -581,12 +594,12 @@ function Studio() {
                   onChange={(e) => setTopic(e.target.value)}
                   placeholder="e.g. what changed with GPT-5.6 for engineering teams"
                   disabled={busy}
-                  className="w-full border-b border-border bg-transparent px-0 py-3 text-base placeholder:text-muted-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+                  className="w-full rounded-xl border border-border bg-background/40 px-4 py-3 text-base placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
                   onKeyDown={(e) => { if (e.key === "Enter") onGenerate(); }}
                 />
                 {companies.length > 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Detected: <span className="text-foreground">{companies.map((c) => `@${c}`).join(" · ")}</span>
+                    Detected: <span className="text-gradient font-medium">{companies.map((c) => `@${c}`).join(" · ")}</span>
                   </p>
                 )}
               </div>
@@ -597,7 +610,7 @@ function Studio() {
                   id="style" value={style}
                   onChange={(e) => setStyle(e.target.value as WritingStyle)}
                   disabled={busy}
-                  className="w-full border-b border-border bg-transparent px-0 py-3 text-base focus:border-accent focus:outline-none disabled:opacity-50"
+                  className="w-full rounded-xl border border-border bg-background/40 px-4 py-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
                 >
                   {STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -608,61 +621,62 @@ function Studio() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {LENGTH_PRESETS.map((n) => (
                     <button key={n} type="button" onClick={() => setTargetChars(n)} disabled={busy}
-                      className={`px-3 py-1.5 text-xs uppercase tracking-widest border ${
-                        targetChars === n ? "bg-foreground text-background border-foreground"
-                          : "border-border text-muted-foreground hover:text-foreground hover:border-foreground"
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-widest transition ${
+                        targetChars === n ? "gradient-primary text-primary-foreground shadow-md shadow-primary/30"
+                          : "border border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
                       }`}>{n}</button>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div>
+            <div className="mt-6">
               <Label htmlFor="instructions">Custom Prompt <span className="normal-case tracking-normal text-muted-foreground/70">(optional — extra instructions the AI must follow)</span></Label>
               <textarea
                 id="instructions" value={customInstructions}
                 onChange={(e) => setCustomInstructions(e.target.value)}
                 placeholder="e.g. Include a real example from fintech. Avoid buzzwords. End with a question about hiring."
                 disabled={busy} rows={3}
-                className="w-full resize-y border border-border bg-transparent p-3 text-sm placeholder:text-muted-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+                className="w-full resize-y rounded-xl border border-border bg-background/40 p-3 text-sm placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
               />
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-2 sm:gap-3">
               <button onClick={() => onGenerate()} disabled={busy || !topic.trim()}
-                className="bg-primary px-6 py-3 text-sm font-medium uppercase tracking-widest text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
-                {status.kind === "generating" ? "Generating 3 drafts…" : "Generate 3 drafts"}
+                className="gradient-primary glow-primary rounded-xl px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
+                {status.kind === "generating" ? "✨ Generating 3 drafts…" : "✨ Generate 3 drafts"}
               </button>
               <button onClick={onBrainstorm} disabled={busy || (!topic.trim() && !customInstructions.trim())}
-                className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                {status.kind === "brainstorming" ? "Brainstorming…" : "Brainstorm ideas"}
+                className="rounded-xl border border-border bg-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-widest transition hover:border-primary/60 hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40">
+                {status.kind === "brainstorming" ? "Brainstorming…" : "💡 Brainstorm"}
               </button>
               <button onClick={onSuggestFromKnowledge} disabled={busy || knowledge.length === 0}
                 title={knowledge.length === 0 ? "Add notes in Knowledge first" : "Suggest topics grounded in your knowledge base"}
-                className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                {status.kind === "suggesting-from-kb" ? "Reading your notes…" : `Suggest from Knowledge${knowledge.length ? ` (${knowledge.length})` : ""}`}
+                className="rounded-xl border border-border bg-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-widest transition hover:border-primary/60 hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40">
+                {status.kind === "suggesting-from-kb" ? "Reading notes…" : `📚 From Knowledge${knowledge.length ? ` · ${knowledge.length}` : ""}`}
               </button>
               <button onClick={onSuggestHooks} disabled={busy || !topic.trim()}
-                className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                {status.kind === "generating-hooks" ? "Finding hooks…" : "Suggest hooks"}
+                className="rounded-xl border border-border bg-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-widest transition hover:border-primary/60 hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40">
+                {status.kind === "generating-hooks" ? "Finding hooks…" : "🎣 Hooks"}
               </button>
+            </div>
             </div>
 
             {brainstormOpen && ideas.length > 0 && (
-              <div className="border border-border p-4">
+              <div className="glass rounded-2xl p-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea board</p>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gradient">💡 Idea board</p>
                   <div className="flex gap-3 text-[10px] uppercase tracking-widest">
-                    <button onClick={onBrainstorm} disabled={busy} className="text-muted-foreground hover:text-accent">Regenerate</button>
+                    <button onClick={onBrainstorm} disabled={busy} className="text-muted-foreground hover:text-primary">Regenerate</button>
                     <button onClick={() => setBrainstormOpen(false)} className="text-muted-foreground hover:text-foreground">Close</button>
                   </div>
                 </div>
                 <ul className="space-y-2">
                   {ideas.map((idea, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="mt-1 text-muted-foreground text-xs">{i + 1}.</span>
+                    <li key={i} className="flex items-start gap-3 rounded-lg p-2 transition hover:bg-white/5">
+                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full gradient-primary text-[10px] font-bold text-primary-foreground">{i + 1}</span>
                       <button type="button" onClick={() => { setTopic(idea); setBrainstormOpen(false); }} disabled={busy}
-                        className="flex-1 text-left text-sm hover:text-accent">
+                        className="flex-1 text-left text-sm hover:text-foreground">
                         {idea}
                       </button>
                     </li>
@@ -672,14 +686,14 @@ function Studio() {
             )}
 
             {hooks.length > 0 && (
-              <div className="border border-border p-4">
-                <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">Pick a hook</p>
+              <div className="glass rounded-2xl p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gradient">🎣 Pick a hook</p>
                 <ul className="space-y-2">
                   {hooks.map((h, i) => (
                     <li key={i}>
                       <button type="button" onClick={() => onGenerate(h)} disabled={busy}
-                        className="w-full text-left text-sm hover:text-accent">
-                        <span className="mr-2 text-muted-foreground">{i + 1}.</span>{h}
+                        className="w-full rounded-lg p-2 text-left text-sm transition hover:bg-white/5">
+                        <span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full gradient-primary text-[10px] font-bold text-primary-foreground">{i + 1}</span>{h}
                       </button>
                     </li>
                   ))}
@@ -689,36 +703,36 @@ function Studio() {
 
             {variants.length > 0 && (
               <div>
-                <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">Versions</p>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Versions</p>
                 <div className="grid grid-cols-3 gap-2">
                   {variants.map((_, i) => (
                     <button key={i} type="button" onClick={() => selectVariant(i)} disabled={busy}
-                      className={`border px-3 py-2 text-xs uppercase tracking-widest ${
-                        selectedVariant === i ? "bg-foreground text-background border-foreground"
-                          : "border-border text-muted-foreground hover:text-foreground hover:border-foreground"
+                      className={`rounded-xl px-3 py-2.5 text-xs font-semibold uppercase tracking-widest transition ${
+                        selectedVariant === i ? "gradient-primary text-primary-foreground shadow-md shadow-primary/30"
+                          : "border border-border bg-white/5 text-muted-foreground hover:border-primary/60 hover:text-foreground"
                       }`}>Version {String.fromCharCode(65 + i)}</button>
                   ))}
                 </div>
               </div>
             )}
 
-            <div>
-              <Label htmlFor="post">Draft {currentDraftId && <span className="normal-case tracking-normal text-muted-foreground/70">· saved</span>}</Label>
+            <div className="glass rounded-3xl p-5 sm:p-6">
+              <Label htmlFor="post">Draft {currentDraftId && <span className="normal-case tracking-normal text-primary">· saved</span>}</Label>
               <textarea
                 id="post" value={post}
                 onChange={(e) => { setPost(e.target.value); setScore(null); }}
                 placeholder="Generate drafts, or write directly here."
                 disabled={busy} rows={14}
-                className="w-full resize-y border border-border bg-card p-4 text-base leading-relaxed placeholder:text-muted-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+                className="w-full resize-y rounded-2xl border border-border bg-background/50 p-4 text-base leading-relaxed placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
                 style={{ whiteSpace: "pre-wrap" }}
               />
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
-                <span className={overFold ? "text-accent" : "text-muted-foreground"}>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+                <span className={overFold ? "font-medium text-accent" : "text-muted-foreground"}>
                   {overFold
-                    ? `${charCount - TRUNCATION_LIMIT} chars past the "see more" cutoff`
-                    : `${TRUNCATION_LIMIT - charCount} chars until the "see more" cutoff`}
+                    ? `⚠ ${charCount - TRUNCATION_LIMIT} chars past the "see more" fold`
+                    : `${TRUNCATION_LIMIT - charCount} chars until "see more" fold`}
                 </span>
-                <span className={overMax ? "text-red-600 font-semibold" : overTarget ? "text-accent" : "text-muted-foreground"}>
+                <span className={overMax ? "font-semibold text-destructive" : overTarget ? "font-medium text-accent" : "text-muted-foreground"}>
                   {charCount} / {targetChars}
                   {overMax ? ` · over ${MAX_POST_CHARS} hard limit` : ""}
                 </span>
@@ -726,54 +740,54 @@ function Studio() {
             </div>
 
             {post.trim() && (
-              <div className="border border-border p-4">
+              <div className="glass rounded-2xl p-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">One-click rewrites</p>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gradient">⚡ One-click rewrites</p>
                   <button type="button" onClick={onScore} disabled={busy}
-                    className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent">
-                    {status.kind === "scoring" ? "Scoring…" : score ? "Rescore" : "Score post"}
+                    className="rounded-lg border border-border px-3 py-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground transition hover:border-primary/60 hover:text-foreground">
+                    {status.kind === "scoring" ? "Scoring…" : score ? "↻ Rescore" : "★ Score post"}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {SUGGESTIONS.map((s) => (
                     <button key={s.value} type="button" onClick={() => onSuggestion(s.value)} disabled={busy}
-                      className="border border-border px-3 py-1.5 text-xs uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                      className="rounded-full border border-border bg-white/5 px-3 py-1.5 text-xs font-medium transition hover:border-primary/60 hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40">
                       {s.label}
                     </button>
                   ))}
                 </div>
                 {score && (
-                  <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4 text-xs sm:grid-cols-6">
+                  <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border/60 pt-5 text-xs sm:grid-cols-3 lg:grid-cols-6">
                     <ScoreCell label="Hook" v={score.hook} />
                     <ScoreCell label="Readability" v={score.readability} />
                     <ScoreCell label="Virality" v={score.virality} />
                     <ScoreCell label="Tone" v={score.professionalTone} />
                     <ScoreCell label="CTA" v={score.cta} />
                     <ScoreCell label="Overall" v={score.overall} bold />
-                    {score.notes && <p className="col-span-3 text-muted-foreground sm:col-span-6">{score.notes}</p>}
+                    {score.notes && <p className="col-span-2 rounded-lg bg-white/5 p-3 text-muted-foreground sm:col-span-3 lg:col-span-6">💬 {score.notes}</p>}
                   </div>
                 )}
               </div>
             )}
 
             {/* Image */}
-            <div className="border-t border-border pt-8">
+            <div className="glass rounded-2xl p-5">
               <Label>Image <span className="normal-case tracking-normal text-muted-foreground/70">(optional)</span></Label>
-              <div className="mt-3 inline-flex border border-border">
+              <div className="mt-3 inline-flex rounded-xl border border-border bg-background/40 p-1">
                 {(["search", "upload"] as const).map((m) => (
                   <button key={m} type="button" onClick={() => setImageMode(m)} disabled={busy}
-                    className={`px-4 py-2 text-xs uppercase tracking-widest ${
-                      imageMode === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
-                    }`}>{m === "search" ? "Search web" : "Upload"}</button>
+                    className={`rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-widest transition ${
+                      imageMode === m ? "gradient-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    }`}>{m === "search" ? "🔍 Search web" : "⬆ Upload"}</button>
                 ))}
               </div>
 
               {image && (
                 <div className="mt-4 flex flex-wrap items-start gap-4">
-                  <div className="relative h-32 w-32 overflow-hidden border border-border">
+                  <div className="relative h-32 w-32 overflow-hidden rounded-xl border border-border">
                     <img src={image.previewUrl} alt={image.filename} className="h-full w-full object-cover" />
                     <button type="button" onClick={removeImage} disabled={busy} aria-label="Remove image"
-                      className="absolute right-0 top-0 bg-background/90 px-2 py-0.5 text-xs hover:text-accent">×</button>
+                      className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-background/90 text-xs hover:bg-destructive hover:text-destructive-foreground">×</button>
                   </div>
                   <p className="text-xs text-muted-foreground">Selected: <span className="text-foreground">{image.filename}</span></p>
                 </div>
@@ -787,9 +801,9 @@ function Studio() {
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSearchImages(); } }}
                       placeholder={topic ? `Search images (default: "${topic.slice(0, 40)}")` : "Search the web for images…"}
                       disabled={busy}
-                      className="flex-1 min-w-[200px] border border-border bg-transparent px-3 py-2 text-sm focus:border-accent focus:outline-none disabled:opacity-50" />
+                      className="flex-1 min-w-[200px] rounded-xl border border-border bg-background/40 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50" />
                     <button type="button" onClick={onSearchImages} disabled={busy || (!imageQuery.trim() && !topic.trim())}
-                      className="border border-border px-4 py-2 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                      className="rounded-xl gradient-primary px-4 py-2 text-xs font-semibold uppercase tracking-widest text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
                       {status.kind === "searching-images" ? "Searching…" : "Search"}
                     </button>
                   </div>
@@ -800,7 +814,7 @@ function Studio() {
                         {imageResults.map((r) => (
                           <button key={r.id} type="button" onClick={() => onChooseWebImage(r)} disabled={busy}
                             title={r.title || "image"}
-                            className="group relative aspect-square overflow-hidden border border-border hover:border-accent disabled:cursor-not-allowed disabled:opacity-40">
+                            className="group relative aspect-square overflow-hidden rounded-xl border border-border transition hover:border-primary hover:shadow-lg hover:shadow-primary/30 disabled:cursor-not-allowed disabled:opacity-40">
                             <img
                               src={r.thumbnail}
                               alt={r.title || ""}
