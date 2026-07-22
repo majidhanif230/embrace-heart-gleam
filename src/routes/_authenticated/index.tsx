@@ -230,7 +230,7 @@ function Studio() {
     setScore(null);
     try {
       const res = await generatePostVariants({
-        data: { topic: topic.trim(), style, targetChars, hookOverride, voiceNotes },
+        data: { topic: topic.trim(), style, targetChars, hookOverride, voiceNotes, customInstructions: customInstructions || undefined },
       });
       const trimmed = res.variants.map((v) => trimToMax(v, targetChars));
       setVariants(trimmed);
@@ -895,9 +895,9 @@ function ScoreCell({ label, v, bold }: { label: string; v: number; bold?: boolea
 }
 
 function LinkedInPreview({ text, imageUrl, mode }: { text: string; imageUrl: string | null; mode: "desktop" | "mobile" }) {
-  const width = mode === "mobile" ? "max-w-[360px]" : "w-full";
+  const width = mode === "mobile" ? "w-[320px] max-w-full mx-auto text-[13px]" : "w-full";
   return (
-    <div className={`${width} border border-border bg-card`}>
+    <div className={`${width} border border-border bg-card overflow-hidden`}>
       <div className="flex items-center gap-3 border-b border-border p-3">
         <div className="h-10 w-10 rounded-full bg-muted" />
         <div className="flex-1">
@@ -930,7 +930,9 @@ function StatusLine({ status }: { status: Status }) {
   const labels: Record<string, string> = {
     generating: "Generating 3 drafts…",
     "generating-hooks": "Finding hooks…",
-    "generating-image": "Generating image…",
+    brainstorming: "Brainstorming ideas…",
+    "searching-images": "Searching images…",
+    "fetching-image": "Attaching image…",
     scoring: "Scoring…",
     rewriting: "Rewriting…",
     saving: "Saving draft…",
