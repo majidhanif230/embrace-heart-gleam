@@ -65,6 +65,140 @@ export const deleteKnowledge = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+// Extract text from an uploaded file (image / pdf / docx / pptx) so it can
+// be stored in the user's knowledge base. Runs entirely server-side.
+const FileInput = z.object({
+  filename: z.string().min(1).max(300),
+  mimeType: z.string().min(1).max(200),
+  dataBase64: z.string().min(1),
+});
+
+function b64ToUint8(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function stripXmlToText(xml: string): string {
+  return xml
+    .replace(/<a:br\s*\/>/g, "\n")
+    .replace(/<\/a:p>/g, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+async function extractDocx(bytes: Uint8Array): Promise<string> {
+  const mammoth = (await import("mammoth")).default ?? (await import("mammoth"));
+  // mammoth accepts a Buffer via arrayBuffer
+  const { value } = await (mammoth as { extractRawText: (o: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }> })
+    .extractRawText({ arrayBuffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer });
+  return (value ?? "").trim();
+}
+
+async function extractPptx(bytes: Uint8Array): Promise<string> {
+  const JSZipMod = await import("jszip");
+  const JSZip = (JSZipMod as { default?: typeof import("jszip") }).default ?? (JSZipMod as unknown as typeof import("jszip"));
+  const zip = await JSZip.loadAsync(bytes);
+  const slideFiles = Object.keys(zip.files)
+    .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => {
+      const na = Number(a.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+      const nb = Number(b.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+      return na - nb;
+    });
+  const parts: string[] = [];
+  for (let i = 0; i < slideFiles.length; i++) {
+    const xml = await zip.files[slideFiles[i]].async("string");
+    const text = stripXmlToText(xml);
+    if (text) parts.push(`--- Slide ${i + 1} ---\n${text}`);
+  }
+  return parts.join("\n\n").trim();
+}
+
+async function extractViaGeminiFile(opts: {
+  key: string;
+  mimeType: string;
+  dataBase64: string;
+  filename: string;
+  kind: "image" | "pdf";
+}): Promise<string> {
+  const instruction = opts.kind === "image"
+    ? "Extract all text visible in this image and then describe the key concepts, data, and takeaways in structured notes. Preserve any lists, tables, quotes, or numbers verbatim. Output plain text only."
+    : "Read this document and produce a thorough, faithful extract as structured notes: key ideas, definitions, arguments, data points, quotes, and takeaways. Preserve numbers and lists verbatim. Output plain text only, no preamble.";
+  const content = opts.kind === "image"
+    ? [
+        { type: "text", text: instruction },
+        { type: "image_url", image_url: { url: `data:${opts.mimeType};base64,${opts.dataBase64}` } },
+      ]
+    : [
+        { type: "text", text: instruction },
+        { type: "file", file: { filename: opts.filename, file_data: `data:${opts.mimeType};base64,${opts.dataBase64}` } },
+      ];
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${opts.key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [{ role: "user", content }],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Extraction failed [${res.status}]: ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  return (json.choices?.[0]?.message?.content ?? "").trim();
+}
+
+export const extractKnowledgeFromFile = createServerFn({ method: "POST" })
+  .middleware([requireLinkedInSession])
+  .inputValidator((input: unknown) => FileInput.parse(input))
+  .handler(async ({ data }) => {
+    const bytes = b64ToUint8(data.dataBase64);
+    if (bytes.byteLength > 20 * 1024 * 1024) throw new Error("File is over 20 MB.");
+    const name = data.filename.toLowerCase();
+    const mime = data.mimeType.toLowerCase();
+
+    let text = "";
+    let kind = "";
+    if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/.test(name)) {
+      kind = "image";
+      const key = process.env.LOVABLE_API_KEY;
+      if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+      text = await extractViaGeminiFile({ key, mimeType: mime || "image/jpeg", dataBase64: data.dataBase64, filename: data.filename, kind: "image" });
+    } else if (mime === "application/pdf" || name.endsWith(".pdf")) {
+      kind = "pdf";
+      const key = process.env.LOVABLE_API_KEY;
+      if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+      text = await extractViaGeminiFile({ key, mimeType: "application/pdf", dataBase64: data.dataBase64, filename: data.filename, kind: "pdf" });
+    } else if (name.endsWith(".docx") || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      kind = "docx";
+      text = await extractDocx(bytes);
+    } else if (name.endsWith(".pptx") || mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
+      kind = "pptx";
+      text = await extractPptx(bytes);
+    } else if (mime.startsWith("text/") || /\.(txt|md|markdown|csv)$/.test(name)) {
+      kind = "text";
+      text = new TextDecoder("utf-8").decode(bytes);
+    } else {
+      throw new Error(`Unsupported file type: ${data.mimeType || data.filename}. Try image, PDF, DOCX, or PPTX.`);
+    }
+
+    text = text.trim();
+    if (!text) throw new Error("No readable content found in file.");
+    if (text.length > 20000) text = text.slice(0, 20000);
+    const title = data.filename.replace(/\.[^.]+$/, "").slice(0, 200);
+    return { title, content: text, kind };
+  });
+
 // Suggest 8 LinkedIn post topics grounded in the user's saved knowledge base.
 export const suggestTopicsFromKnowledge = createServerFn({ method: "POST" })
   .middleware([requireLinkedInSession])

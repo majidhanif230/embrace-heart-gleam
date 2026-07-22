@@ -18,6 +18,7 @@ import {
   upsertKnowledge,
   deleteKnowledge,
   suggestTopicsFromKnowledge,
+  extractKnowledgeFromFile,
 } from "@/lib/knowledge.functions";
 import {
   listDrafts,
@@ -50,6 +51,7 @@ type Status =
   | { kind: "suggesting-from-kb" }
   | { kind: "searching-images" }
   | { kind: "fetching-image" }
+  | { kind: "extracting-file" }
   | { kind: "scoring" }
   | { kind: "rewriting" }
   | { kind: "saving" }
@@ -257,6 +259,35 @@ function Studio() {
     await deleteKnowledge({ data: { id } });
     if (kbEditingId === id) resetKbForm();
     refreshKnowledge();
+  };
+
+  const onKnowledgeFileSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (file.size > 20 * 1024 * 1024) {
+      setStatus({ kind: "error", message: `${file.name}: over 20 MB` });
+      return;
+    }
+    setStatus({ kind: "extracting-file" });
+    try {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = "";
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+      }
+      const dataBase64 = btoa(binary);
+      const res = await extractKnowledgeFromFile({
+        data: { filename: file.name, mimeType: file.type || "application/octet-stream", dataBase64 },
+      });
+      const separator = kbContent.trim() ? "\n\n" : "";
+      setKbContent((prev) => prev + separator + res.content);
+      if (!kbTitle.trim()) setKbTitle(res.title);
+      setStatus({ kind: "idle" });
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Extraction failed" });
+    }
   };
 
   const onSuggestFromKnowledge = async () => {
@@ -770,12 +801,33 @@ function Studio() {
                           <button key={r.id} type="button" onClick={() => onChooseWebImage(r)} disabled={busy}
                             title={r.title || "image"}
                             className="group relative aspect-square overflow-hidden border border-border hover:border-accent disabled:cursor-not-allowed disabled:opacity-40">
-                            <img src={r.thumbnail} alt={r.title || ""} loading="lazy" className="h-full w-full object-cover transition group-hover:opacity-80" />
+                            <img
+                              src={r.thumbnail}
+                              alt={r.title || ""}
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                if (img.dataset.fallback !== "1" && r.url && r.url !== r.thumbnail) {
+                                  img.dataset.fallback = "1";
+                                  img.src = r.url;
+                                } else {
+                                  img.style.display = "none";
+                                }
+                              }}
+                              className="h-full w-full object-cover transition group-hover:opacity-80"
+                            />
                           </button>
                         ))}
                       </div>
                       {status.kind === "fetching-image" && <p className="text-xs text-muted-foreground">Attaching image…</p>}
                     </>
+                  )}
+                  {status.kind === "searching-images" && (
+                    <p className="text-xs text-muted-foreground">Searching images…</p>
+                  )}
+                  {imageResults.length === 0 && status.kind !== "searching-images" && (imageQuery.trim() || topic.trim()) && (
+                    <p className="text-[11px] text-muted-foreground">No results yet. Type a query and press Search.</p>
                   )}
                 </div>
               ) : (
@@ -941,6 +993,17 @@ function Studio() {
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   {kbEditingId ? "Edit entry" : "Add new entry"}
                 </p>
+                <label className={`flex cursor-pointer items-center justify-center border border-dashed border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground hover:border-accent hover:text-accent ${status.kind === "extracting-file" ? "pointer-events-none opacity-50" : ""}`}>
+                  {status.kind === "extracting-file" ? "Extracting…" : "Import file (image · PDF · DOCX · PPTX)"}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,.pdf,.docx,.pptx,.txt,.md,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    className="hidden"
+                    onChange={(e) => { onKnowledgeFileSelected(e.target.files); e.currentTarget.value = ""; }}
+                    disabled={status.kind === "extracting-file"}
+                  />
+                </label>
+                <p className="text-[10px] text-muted-foreground">Drop a slide deck, PDF, Word doc, or image — the AI extracts text into notes you can edit below.</p>
                 <input type="text" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)}
                   placeholder="Title (optional) — e.g. Lessons from scaling a fintech to 10M users"
                   maxLength={200}
@@ -1074,6 +1137,7 @@ function StatusLine({ status }: { status: Status }) {
     "suggesting-from-kb": "Reading your knowledge base…",
     "searching-images": "Searching images…",
     "fetching-image": "Attaching image…",
+    "extracting-file": "Extracting file…",
     scoring: "Scoring…",
     rewriting: "Rewriting…",
     saving: "Saving draft…",
