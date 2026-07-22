@@ -73,8 +73,9 @@ function buildPostPrompt(opts: {
   hookOverride?: string;
   companies: string[];
   voiceNotes?: string;
+  customInstructions?: string;
 }): string {
-  const { topic, style, targetChars, variantNote, hookOverride, companies, voiceNotes } = opts;
+  const { topic, style, targetChars, variantNote, hookOverride, companies, voiceNotes, customInstructions } = opts;
   const minChars = Math.max(150, Math.round(targetChars * 0.82));
   return `You are a top LinkedIn creator. Write ONE high-quality LinkedIn post that feels human, not AI.
 
@@ -82,6 +83,7 @@ TOPIC: ${topic}
 WRITING STYLE: ${WRITING_STYLES[style]}
 TARGET LENGTH: approximately ${targetChars} characters (between ${minChars} and ${targetChars}). NEVER exceed ${targetChars}.
 ${voiceNotes && voiceNotes.trim() ? `\nUSER'S PERSONAL VOICE (match this style closely):\n"${voiceNotes.trim()}"\n` : ""}
+${customInstructions && customInstructions.trim() ? `\nUSER'S CUSTOM INSTRUCTIONS (follow these strictly):\n"${customInstructions.trim()}"\n` : ""}
 ${hookOverride ? `\nHOOK (use this exact line as line 1, wrapped in **double asterisks**):\n"${hookOverride}"\n` : ""}
 ${variantNote ? `\nVARIANT DIRECTION: ${variantNote}\n` : ""}
 ${companies.length ? `\nRELEVANT COMPANIES (mention naturally where it fits, no forced tags): ${companies.join(", ")}\n` : ""}
@@ -127,6 +129,7 @@ export const generatePostVariants = createServerFn({ method: "POST" })
         targetChars: z.number().int().min(200).max(3000),
         hookOverride: z.string().max(300).optional(),
         voiceNotes: z.string().max(2000).optional(),
+        customInstructions: z.string().max(2000).optional(),
       })
       .parse(input),
   )
@@ -155,6 +158,7 @@ export const generatePostVariants = createServerFn({ method: "POST" })
             hookOverride: data.hookOverride,
             companies,
             voiceNotes: data.voiceNotes,
+            customInstructions: data.customInstructions,
           }),
         });
         return toUnicodeBold(text.trim());
