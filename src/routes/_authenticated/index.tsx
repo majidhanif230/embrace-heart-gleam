@@ -6,10 +6,11 @@ import {
   scorePost,
   applySuggestion,
   publishPost,
-  generateImage,
+  brainstormTopics,
+  searchImages,
+  fetchImageAsBase64,
   type WritingStyle,
   type Suggestion,
-  type ImageStyle,
 } from "@/lib/linkedin.functions";
 import { getProfile, updateProfile } from "@/lib/profile.functions";
 import {
@@ -39,7 +40,9 @@ type Status =
   | { kind: "idle" }
   | { kind: "generating" }
   | { kind: "generating-hooks" }
-  | { kind: "generating-image" }
+  | { kind: "brainstorming" }
+  | { kind: "searching-images" }
+  | { kind: "fetching-image" }
   | { kind: "scoring" }
   | { kind: "rewriting" }
   | { kind: "saving" }
@@ -61,16 +64,6 @@ const STYLE_OPTIONS: { value: WritingStyle; label: string }[] = [
 ];
 
 const LENGTH_PRESETS = [500, 1000, 1500, 2000, 2500, 3000] as const;
-
-const IMAGE_STYLE_OPTIONS: { value: ImageStyle; label: string }[] = [
-  { value: "editorial", label: "Editorial" },
-  { value: "photo", label: "Photo" },
-  { value: "illustration", label: "Illustration" },
-  { value: "3d", label: "3D" },
-  { value: "icons", label: "Icons" },
-  { value: "minimal", label: "Minimal" },
-  { value: "corporate", label: "Corporate" },
-];
 
 const SUGGESTIONS: { value: Suggestion; label: string }[] = [
   { value: "more-emotional", label: "More emotional" },
@@ -188,8 +181,14 @@ function Studio() {
   const [score, setScore] = useState<Score | null>(null);
   const [companies, setCompanies] = useState<string[]>([]);
   const [image, setImage] = useState<PendingImage | null>(null);
-  const [imageMode, setImageMode] = useState<"ai" | "upload">("ai");
-  const [imageStyle, setImageStyle] = useState<ImageStyle>("editorial");
+  const [imageMode, setImageMode] = useState<"search" | "upload">("search");
+  const [imageQuery, setImageQuery] = useState("");
+  const [imageResults, setImageResults] = useState<Array<{
+    id: string; title: string; url: string; thumbnail: string; creator: string; source: string; license: string; landing: string;
+  }>>([]);
+  const [ideas, setIdeas] = useState<string[]>([]);
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [brainstormOpen, setBrainstormOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
@@ -231,7 +230,7 @@ function Studio() {
     setScore(null);
     try {
       const res = await generatePostVariants({
-        data: { topic: topic.trim(), style, targetChars, hookOverride, voiceNotes },
+        data: { topic: topic.trim(), style, targetChars, hookOverride, voiceNotes, customInstructions: customInstructions || undefined },
       });
       const trimmed = res.variants.map((v) => trimToMax(v, targetChars));
       setVariants(trimmed);
@@ -399,16 +398,48 @@ function Studio() {
 
   const removeImage = () => { if (image) URL.revokeObjectURL(image.previewUrl); setImage(null); };
 
-  const onGenerateImage = async () => {
-    if (!topic.trim()) { setStatus({ kind: "error", message: "Enter a topic first." }); return; }
-    setStatus({ kind: "generating-image" });
+  const onSearchImages = async () => {
+    const q = (imageQuery || topic).trim();
+    if (!q) { setStatus({ kind: "error", message: "Enter a search query or topic." }); return; }
+    setStatus({ kind: "searching-images" });
     try {
-      const res = await generateImage({ data: { topic: topic.trim(), style: imageStyle } });
+      const res = await searchImages({ data: { query: q, page: 1 } });
+      setImageResults(res.results);
+      setStatus(post.trim() ? { kind: "ready" } : { kind: "idle" });
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const onChooseWebImage = async (r: { url: string; title: string; thumbnail: string }) => {
+    setStatus({ kind: "fetching-image" });
+    try {
+      // Try full URL first; if it fails, fall back to thumbnail.
+      let res;
+      try {
+        res = await fetchImageAsBase64({ data: { url: r.url, filename: (r.title || "web-image").slice(0, 60) } });
+      } catch {
+        res = await fetchImageAsBase64({ data: { url: r.thumbnail, filename: (r.title || "web-image").slice(0, 60) } });
+      }
       if (image) URL.revokeObjectURL(image.previewUrl);
       setImage({
         filename: res.filename, mimeType: res.mimeType, dataBase64: res.dataBase64,
         previewUrl: base64ToPreviewUrl(res.dataBase64, res.mimeType),
       });
+      setStatus(post.trim() ? { kind: "ready" } : { kind: "idle" });
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const onBrainstorm = async () => {
+    const seed = (topic || customInstructions).trim();
+    if (!seed) { setStatus({ kind: "error", message: "Type a niche, seed, or question first." }); return; }
+    setStatus({ kind: "brainstorming" });
+    try {
+      const res = await brainstormTopics({ data: { seed, style, voiceNotes } });
+      setIdeas(res.ideas);
+      setBrainstormOpen(true);
       setStatus(post.trim() ? { kind: "ready" } : { kind: "idle" });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed" });
@@ -490,16 +521,54 @@ function Studio() {
               </div>
             </div>
 
+            <div>
+              <Label htmlFor="instructions">Custom Prompt <span className="normal-case tracking-normal text-muted-foreground/70">(optional — extra instructions the AI must follow)</span></Label>
+              <textarea
+                id="instructions" value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="e.g. Include a real example from fintech. Avoid buzzwords. End with a question about hiring."
+                disabled={busy} rows={3}
+                className="w-full resize-y border border-border bg-transparent p-3 text-sm placeholder:text-muted-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+              />
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <button onClick={() => onGenerate()} disabled={busy || !topic.trim()}
                 className="bg-primary px-6 py-3 text-sm font-medium uppercase tracking-widest text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
                 {status.kind === "generating" ? "Generating 3 drafts…" : "Generate 3 drafts"}
+              </button>
+              <button onClick={onBrainstorm} disabled={busy || (!topic.trim() && !customInstructions.trim())}
+                className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                {status.kind === "brainstorming" ? "Brainstorming…" : "Brainstorm ideas"}
               </button>
               <button onClick={onSuggestHooks} disabled={busy || !topic.trim()}
                 className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
                 {status.kind === "generating-hooks" ? "Finding hooks…" : "Suggest hooks"}
               </button>
             </div>
+
+            {brainstormOpen && ideas.length > 0 && (
+              <div className="border border-border p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea board</p>
+                  <div className="flex gap-3 text-[10px] uppercase tracking-widest">
+                    <button onClick={onBrainstorm} disabled={busy} className="text-muted-foreground hover:text-accent">Regenerate</button>
+                    <button onClick={() => setBrainstormOpen(false)} className="text-muted-foreground hover:text-foreground">Close</button>
+                  </div>
+                </div>
+                <ul className="space-y-2">
+                  {ideas.map((idea, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-1 text-muted-foreground text-xs">{i + 1}.</span>
+                      <button type="button" onClick={() => { setTopic(idea); setBrainstormOpen(false); }} disabled={busy}
+                        className="flex-1 text-left text-sm hover:text-accent">
+                        {idea}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {hooks.length > 0 && (
               <div className="border border-border p-4">
@@ -590,43 +659,57 @@ function Studio() {
             <div className="border-t border-border pt-8">
               <Label>Image <span className="normal-case tracking-normal text-muted-foreground/70">(optional)</span></Label>
               <div className="mt-3 inline-flex border border-border">
-                {(["ai", "upload"] as const).map((m) => (
+                {(["search", "upload"] as const).map((m) => (
                   <button key={m} type="button" onClick={() => setImageMode(m)} disabled={busy}
                     className={`px-4 py-2 text-xs uppercase tracking-widest ${
                       imageMode === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
-                    }`}>{m === "ai" ? "Generate with AI" : "Upload"}</button>
+                    }`}>{m === "search" ? "Search web" : "Upload"}</button>
                 ))}
               </div>
 
-              {imageMode === "ai" && (
-                <div className="mt-4">
-                  <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Style</p>
-                  <div className="flex flex-wrap gap-2">
-                    {IMAGE_STYLE_OPTIONS.map((o) => (
-                      <button key={o.value} type="button" onClick={() => setImageStyle(o.value)} disabled={busy}
-                        className={`px-3 py-1.5 text-xs uppercase tracking-widest border ${
-                          imageStyle === o.value ? "bg-foreground text-background border-foreground"
-                            : "border-border text-muted-foreground hover:text-foreground"
-                        }`}>{o.label}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-wrap items-start gap-4">
-                {image && (
+              {image && (
+                <div className="mt-4 flex flex-wrap items-start gap-4">
                   <div className="relative h-32 w-32 overflow-hidden border border-border">
                     <img src={image.previewUrl} alt={image.filename} className="h-full w-full object-cover" />
                     <button type="button" onClick={removeImage} disabled={busy} aria-label="Remove image"
                       className="absolute right-0 top-0 bg-background/90 px-2 py-0.5 text-xs hover:text-accent">×</button>
                   </div>
-                )}
-                {imageMode === "ai" ? (
-                  <button type="button" onClick={onGenerateImage} disabled={busy || !topic.trim()}
-                    className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                    {status.kind === "generating-image" ? "Generating image…" : image ? "Regenerate image" : "Generate image"}
-                  </button>
-                ) : (
+                  <p className="text-xs text-muted-foreground">Selected: <span className="text-foreground">{image.filename}</span></p>
+                </div>
+              )}
+
+              {imageMode === "search" ? (
+                <div className="mt-4 space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <input type="text" value={imageQuery}
+                      onChange={(e) => setImageQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSearchImages(); } }}
+                      placeholder={topic ? `Search images (default: "${topic.slice(0, 40)}")` : "Search the web for images…"}
+                      disabled={busy}
+                      className="flex-1 min-w-[200px] border border-border bg-transparent px-3 py-2 text-sm focus:border-accent focus:outline-none disabled:opacity-50" />
+                    <button type="button" onClick={onSearchImages} disabled={busy || (!imageQuery.trim() && !topic.trim())}
+                      className="border border-border px-4 py-2 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                      {status.kind === "searching-images" ? "Searching…" : "Search"}
+                    </button>
+                  </div>
+                  {imageResults.length > 0 && (
+                    <>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Click an image to attach it. Results from Openverse (CC-licensed).</p>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {imageResults.map((r) => (
+                          <button key={r.id} type="button" onClick={() => onChooseWebImage(r)} disabled={busy}
+                            title={r.title || "image"}
+                            className="group relative aspect-square overflow-hidden border border-border hover:border-accent disabled:cursor-not-allowed disabled:opacity-40">
+                            <img src={r.thumbnail} alt={r.title || ""} loading="lazy" className="h-full w-full object-cover transition group-hover:opacity-80" />
+                          </button>
+                        ))}
+                      </div>
+                      {status.kind === "fetching-image" && <p className="text-xs text-muted-foreground">Attaching image…</p>}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-4">
                   <label className={`flex cursor-pointer items-center border border-dashed border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground hover:border-accent hover:text-accent ${busy ? "pointer-events-none opacity-50" : ""}`}>
                     {image ? "Replace image" : "Choose file"}
                     <input ref={fileInputRef} type="file"
@@ -635,8 +718,8 @@ function Studio() {
                       onChange={(e) => onImageSelected(e.target.files)}
                       disabled={busy}/>
                   </label>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Publish / Schedule / Save */}
@@ -812,9 +895,9 @@ function ScoreCell({ label, v, bold }: { label: string; v: number; bold?: boolea
 }
 
 function LinkedInPreview({ text, imageUrl, mode }: { text: string; imageUrl: string | null; mode: "desktop" | "mobile" }) {
-  const width = mode === "mobile" ? "max-w-[360px]" : "w-full";
+  const width = mode === "mobile" ? "w-[320px] max-w-full mx-auto text-[13px]" : "w-full";
   return (
-    <div className={`${width} border border-border bg-card`}>
+    <div className={`${width} border border-border bg-card overflow-hidden`}>
       <div className="flex items-center gap-3 border-b border-border p-3">
         <div className="h-10 w-10 rounded-full bg-muted" />
         <div className="flex-1">
@@ -847,7 +930,9 @@ function StatusLine({ status }: { status: Status }) {
   const labels: Record<string, string> = {
     generating: "Generating 3 drafts…",
     "generating-hooks": "Finding hooks…",
-    "generating-image": "Generating image…",
+    brainstorming: "Brainstorming ideas…",
+    "searching-images": "Searching images…",
+    "fetching-image": "Attaching image…",
     scoring: "Scoring…",
     rewriting: "Rewriting…",
     saving: "Saving draft…",

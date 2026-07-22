@@ -73,8 +73,9 @@ function buildPostPrompt(opts: {
   hookOverride?: string;
   companies: string[];
   voiceNotes?: string;
+  customInstructions?: string;
 }): string {
-  const { topic, style, targetChars, variantNote, hookOverride, companies, voiceNotes } = opts;
+  const { topic, style, targetChars, variantNote, hookOverride, companies, voiceNotes, customInstructions } = opts;
   const minChars = Math.max(150, Math.round(targetChars * 0.82));
   return `You are a top LinkedIn creator. Write ONE high-quality LinkedIn post that feels human, not AI.
 
@@ -82,6 +83,7 @@ TOPIC: ${topic}
 WRITING STYLE: ${WRITING_STYLES[style]}
 TARGET LENGTH: approximately ${targetChars} characters (between ${minChars} and ${targetChars}). NEVER exceed ${targetChars}.
 ${voiceNotes && voiceNotes.trim() ? `\nUSER'S PERSONAL VOICE (match this style closely):\n"${voiceNotes.trim()}"\n` : ""}
+${customInstructions && customInstructions.trim() ? `\nUSER'S CUSTOM INSTRUCTIONS (follow these strictly):\n"${customInstructions.trim()}"\n` : ""}
 ${hookOverride ? `\nHOOK (use this exact line as line 1, wrapped in **double asterisks**):\n"${hookOverride}"\n` : ""}
 ${variantNote ? `\nVARIANT DIRECTION: ${variantNote}\n` : ""}
 ${companies.length ? `\nRELEVANT COMPANIES (mention naturally where it fits, no forced tags): ${companies.join(", ")}\n` : ""}
@@ -127,6 +129,7 @@ export const generatePostVariants = createServerFn({ method: "POST" })
         targetChars: z.number().int().min(200).max(3000),
         hookOverride: z.string().max(300).optional(),
         voiceNotes: z.string().max(2000).optional(),
+        customInstructions: z.string().max(2000).optional(),
       })
       .parse(input),
   )
@@ -155,6 +158,7 @@ export const generatePostVariants = createServerFn({ method: "POST" })
             hookOverride: data.hookOverride,
             companies,
             voiceNotes: data.voiceNotes,
+            customInstructions: data.customInstructions,
           }),
         });
         return toUnicodeBold(text.trim());
@@ -344,6 +348,101 @@ Rules: no text or typography in the image, no logos, no watermarks, no faces of 
     const b64 = json.data?.[0]?.b64_json;
     if (!b64) throw new Error("Image generation returned no image data");
     return { dataBase64: b64, mimeType: "image/png" as const, filename: "ai-generated.png", prompt };
+  });
+
+// Brainstorm 8 fresh LinkedIn topic ideas around a seed / niche / question.
+export const brainstormTopics = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      seed: z.string().min(1).max(500),
+      style: StyleEnum.optional(),
+      voiceNotes: z.string().max(2000).optional(),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+    const gateway = createLovableAiGatewayProvider(key);
+    const prompt = `You are a LinkedIn content strategist. Brainstorm 8 SHARP post ideas around this seed. Each idea should be scroll-stopping and specific — not a generic listicle.
+
+SEED / NICHE / QUESTION: ${data.seed}
+${data.style ? `PREFERRED STYLE: ${WRITING_STYLES[data.style]}\n` : ""}${data.voiceNotes && data.voiceNotes.trim() ? `USER VOICE: "${data.voiceNotes.trim()}"\n` : ""}
+Rules:
+- Each idea is a single sentence (10–20 words) describing the post's angle — not a title.
+- Mix formats: contrarian take, personal story, mini case study, teardown, prediction, tactical guide, mistake/lesson, industry observation.
+- No hashtags, no quotes, no numbering in the sentence itself.
+- Return as a plain numbered list "1.", "2.", ... one per line. Nothing else.`;
+    const { text } = await generateText({
+      model: gateway("google/gemini-3-flash-preview"),
+      prompt,
+    });
+    const ideas = text
+      .split("\n")
+      .map((l) => l.replace(/^\s*\d+[.)-]\s*/, "").replace(/^["'"']|["'"']$/g, "").trim())
+      .filter((l) => l.length > 5 && l.length < 400)
+      .slice(0, 8);
+    return { ideas };
+  });
+
+// Search the web for real images (Openverse — CC-licensed, no key needed).
+export const searchImages = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ query: z.string().min(1).max(200), page: z.number().int().min(1).max(10).default(1) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const url = new URL("https://api.openverse.org/v1/images/");
+    url.searchParams.set("q", data.query);
+    url.searchParams.set("page_size", "16");
+    url.searchParams.set("page", String(data.page));
+    url.searchParams.set("license_type", "commercial");
+    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Image search failed [${res.status}]: ${body.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as {
+      results?: Array<{
+        id: string; title?: string; url: string; thumbnail?: string;
+        creator?: string; source?: string; foreign_landing_url?: string; license?: string;
+      }>;
+    };
+    const results = (json.results ?? []).map((r) => ({
+      id: r.id,
+      title: r.title ?? "",
+      url: r.url,
+      thumbnail: r.thumbnail ?? r.url,
+      creator: r.creator ?? "",
+      source: r.source ?? "",
+      license: r.license ?? "",
+      landing: r.foreign_landing_url ?? "",
+    }));
+    return { results };
+  });
+
+// Download a chosen image URL and return base64 for attachment.
+export const fetchImageAsBase64 = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ url: z.string().url(), filename: z.string().max(200).optional() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const res = await fetch(data.url);
+    if (!res.ok) throw new Error(`Image fetch failed [${res.status}]`);
+    const ct = res.headers.get("content-type") ?? "image/jpeg";
+    if (!/^image\/(png|jpeg|jpg|gif|webp)/.test(ct)) {
+      throw new Error(`Unsupported image type: ${ct}`);
+    }
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.byteLength > 8 * 1024 * 1024) throw new Error("Image over 8 MB");
+    let bin = "";
+    for (let i = 0; i < buf.byteLength; i++) bin += String.fromCharCode(buf[i]);
+    const b64 = btoa(bin);
+    const mime = ct.split(";")[0].trim() as "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+    const ext = mime.split("/")[1];
+    return {
+      dataBase64: b64,
+      mimeType: mime,
+      filename: data.filename ?? `web-image.${ext}`,
+    };
   });
 
 export const publishPost = createServerFn({ method: "POST" })
