@@ -846,8 +846,8 @@ function Studio() {
                 </div>
               ) : (
                 <div className="mt-4">
-                  <label className={`flex cursor-pointer items-center border border-dashed border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground hover:border-accent hover:text-accent ${busy ? "pointer-events-none opacity-50" : ""}`}>
-                    {image ? "Replace image" : "Choose file"}
+                  <label className={`flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border bg-background/40 px-4 py-6 text-xs font-semibold uppercase tracking-widest text-muted-foreground transition hover:border-primary hover:bg-white/5 hover:text-foreground ${busy ? "pointer-events-none opacity-50" : ""}`}>
+                    {image ? "↻ Replace image" : "⬆ Choose file"}
                     <input ref={fileInputRef} type="file"
                       accept="image/png,image/jpeg,image/gif,image/webp"
                       className="hidden"
@@ -859,7 +859,7 @@ function Studio() {
             </div>
 
             {/* Publish / Schedule / Save */}
-            <div className="space-y-4 border-t border-border pt-6">
+            <div className="glass rounded-3xl p-5 sm:p-6 space-y-4">
               <div className="flex flex-wrap items-end gap-3">
                 <div>
                   <Label htmlFor="sched">Schedule for</Label>
@@ -868,20 +868,20 @@ function Studio() {
                     value={scheduleAt}
                     onChange={(e) => setScheduleAt(e.target.value)}
                     disabled={busy}
-                    className="border border-border bg-transparent px-3 py-2 text-sm focus:border-accent focus:outline-none"
+                    className="rounded-xl border border-border bg-background/40 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
                 <button onClick={onSchedule} disabled={busy || !post.trim() || !scheduleAt || overMax}
-                  className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                  {status.kind === "scheduling" ? "Scheduling…" : "Schedule"}
+                  className="rounded-xl border border-border bg-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-widest transition hover:border-primary/60 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">
+                  {status.kind === "scheduling" ? "Scheduling…" : "📅 Schedule"}
                 </button>
                 <button onClick={onSaveDraft} disabled={busy || (!post.trim() && !topic.trim())}
-                  className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                  {status.kind === "saving" ? "Saving…" : "Save draft"}
+                  className="rounded-xl border border-border bg-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-widest transition hover:border-primary/60 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">
+                  {status.kind === "saving" ? "Saving…" : "💾 Save draft"}
                 </button>
                 <button onClick={onPublish} disabled={busy || !post.trim() || overMax}
-                  className="ml-auto whitespace-nowrap bg-accent px-6 py-3 text-sm font-medium uppercase tracking-widest text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
-                  {status.kind === "publishing" ? "Publishing…" : "Publish now"}
+                  className="ml-auto whitespace-nowrap rounded-xl gradient-viral glow-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
+                  {status.kind === "publishing" ? "Publishing…" : "🚀 Publish now"}
                 </button>
               </div>
               <StatusLine status={status} />
@@ -889,12 +889,12 @@ function Studio() {
           </section>
 
           {/* SIDE PANEL */}
-          <aside className="lg:sticky lg:top-8 lg:self-start">
-            <div className="mb-3 inline-flex border border-border text-xs">
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <div className="mb-3 inline-flex rounded-xl border border-border bg-background/40 p-1 text-xs">
               {(["preview", "drafts", "calendar"] as const).map((m) => (
                 <button key={m} onClick={() => setSidePanel(m)}
-                  className={`px-3 py-1 uppercase tracking-widest ${
-                    sidePanel === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                  className={`rounded-lg px-3 py-1.5 font-semibold uppercase tracking-widest transition ${
+                    sidePanel === m ? "gradient-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}>{m === "calendar" ? `Scheduled${scheduledDrafts.length ? ` · ${scheduledDrafts.length}` : ""}` : m}</button>
               ))}
             </div>
@@ -902,11 +902,11 @@ function Studio() {
             {sidePanel === "preview" && (
               <div>
                 <div className="mb-3 flex justify-end">
-                  <div className="inline-flex border border-border text-[10px]">
+                  <div className="inline-flex rounded-lg border border-border bg-background/40 p-0.5 text-[10px]">
                     {(["desktop", "mobile"] as const).map((m) => (
                       <button key={m} onClick={() => setPreviewMode(m)}
-                        className={`px-3 py-1 uppercase tracking-widest ${
-                          previewMode === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                        className={`rounded-md px-3 py-1 font-semibold uppercase tracking-widest transition ${
+                          previewMode === m ? "gradient-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                         }`}>{m}</button>
                     ))}
                   </div>
@@ -941,15 +941,15 @@ function Studio() {
                   .slice()
                   .sort((a, b) => (a.scheduled_for ?? "").localeCompare(b.scheduled_for ?? ""))
                   .map((d) => (
-                    <div key={d.id} className="border border-border p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-accent">
-                        {d.scheduled_for ? new Date(d.scheduled_for).toLocaleString() : "—"}
+                    <div key={d.id} className="glass rounded-xl p-3">
+                      <p className="inline-block rounded-full gradient-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-primary-foreground">
+                        📅 {d.scheduled_for ? new Date(d.scheduled_for).toLocaleString() : "—"}
                       </p>
                       <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed">
                         {d.content.slice(0, 200)}
                       </p>
                       <div className="mt-2 flex gap-3 text-[10px] uppercase tracking-widest">
-                        <button onClick={() => openDraft(d)} className="text-muted-foreground hover:text-accent">Open</button>
+                        <button onClick={() => openDraft(d)} className="text-muted-foreground hover:text-primary">Open</button>
                         <button onClick={() => onCancelSchedule(d.id)} className="text-muted-foreground hover:text-destructive">Cancel</button>
                       </div>
                     </div>
