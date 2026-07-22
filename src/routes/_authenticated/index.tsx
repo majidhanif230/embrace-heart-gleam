@@ -14,6 +14,12 @@ import {
 } from "@/lib/linkedin.functions";
 import { getProfile, updateProfile } from "@/lib/profile.functions";
 import {
+  listKnowledge,
+  upsertKnowledge,
+  deleteKnowledge,
+  suggestTopicsFromKnowledge,
+} from "@/lib/knowledge.functions";
+import {
   listDrafts,
   upsertDraft,
   deleteDraft,
@@ -41,6 +47,7 @@ type Status =
   | { kind: "generating" }
   | { kind: "generating-hooks" }
   | { kind: "brainstorming" }
+  | { kind: "suggesting-from-kb" }
   | { kind: "searching-images" }
   | { kind: "fetching-image" }
   | { kind: "scoring" }
@@ -166,10 +173,24 @@ function trimToMax(text: string, limit: number): string {
   return `${prefix}${body}${suffix}`;
 }
 
+type KnowledgeEntry = {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+};
+
 function Studio() {
   const [userLabel, setUserLabel] = useState<string>("");
   const [voiceNotes, setVoiceNotes] = useState("");
   const [voiceOpen, setVoiceOpen] = useState(false);
+
+  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [kbEditingId, setKbEditingId] = useState<string | null>(null);
+  const [kbTitle, setKbTitle] = useState("");
+  const [kbContent, setKbContent] = useState("");
 
   const [topic, setTopic] = useState("");
   const [style, setStyle] = useState<WritingStyle>("professional");
@@ -203,11 +224,52 @@ function Studio() {
   useEffect(() => {
     getSessionUser().then((u) => setUserLabel(u?.name || u?.email || "")).catch(() => {});
     getProfile().then((p) => setVoiceNotes(p.voice_notes ?? "")).catch(() => {});
+    refreshKnowledge();
     refreshDrafts();
   }, []);
 
   const refreshDrafts = () => {
     listDrafts().then((r) => setDrafts(r.drafts as DraftRow[])).catch(() => {});
+  };
+
+  const refreshKnowledge = () => {
+    listKnowledge().then((r) => setKnowledge(r.entries as KnowledgeEntry[])).catch(() => {});
+  };
+
+  const resetKbForm = () => { setKbEditingId(null); setKbTitle(""); setKbContent(""); };
+
+  const onSaveKnowledge = async () => {
+    if (!kbContent.trim()) return;
+    try {
+      await upsertKnowledge({ data: { id: kbEditingId ?? undefined, title: kbTitle.trim(), content: kbContent.trim() } });
+      resetKbForm();
+      refreshKnowledge();
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Save failed" });
+    }
+  };
+
+  const onEditKnowledge = (k: KnowledgeEntry) => {
+    setKbEditingId(k.id); setKbTitle(k.title); setKbContent(k.content);
+  };
+
+  const onDeleteKnowledge = async (id: string) => {
+    await deleteKnowledge({ data: { id } });
+    if (kbEditingId === id) resetKbForm();
+    refreshKnowledge();
+  };
+
+  const onSuggestFromKnowledge = async () => {
+    setStatus({ kind: "suggesting-from-kb" });
+    try {
+      const res = await suggestTopicsFromKnowledge({ data: { focus: customInstructions || undefined } });
+      setIdeas(res.ideas);
+      setBrainstormOpen(true);
+      setKnowledgeOpen(false);
+      setStatus(post.trim() ? { kind: "ready" } : { kind: "idle" });
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed" });
+    }
   };
 
   const charCount = post.length;
@@ -461,6 +523,9 @@ function Studio() {
           <div className="flex items-center gap-4">
             <button onClick={() => setVoiceOpen(true)} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
               Voice
+            </button>
+            <button onClick={() => setKnowledgeOpen(true)} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
+              Knowledge{knowledge.length ? ` · ${knowledge.length}` : ""}
             </button>
             <button onClick={onNewDraft} className="uppercase tracking-widest text-muted-foreground hover:text-accent">
               New
