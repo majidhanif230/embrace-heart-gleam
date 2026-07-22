@@ -606,6 +606,11 @@ function Studio() {
                 className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
                 {status.kind === "brainstorming" ? "Brainstorming…" : "Brainstorm ideas"}
               </button>
+              <button onClick={onSuggestFromKnowledge} disabled={busy || knowledge.length === 0}
+                title={knowledge.length === 0 ? "Add notes in Knowledge first" : "Suggest topics grounded in your knowledge base"}
+                className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                {status.kind === "suggesting-from-kb" ? "Reading your notes…" : `Suggest from Knowledge${knowledge.length ? ` (${knowledge.length})` : ""}`}
+              </button>
               <button onClick={onSuggestHooks} disabled={busy || !topic.trim()}
                 className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
                 {status.kind === "generating-hooks" ? "Finding hooks…" : "Suggest hooks"}
