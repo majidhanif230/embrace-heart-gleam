@@ -6,10 +6,11 @@ import {
   scorePost,
   applySuggestion,
   publishPost,
-  generateImage,
+  brainstormTopics,
+  searchImages,
+  fetchImageAsBase64,
   type WritingStyle,
   type Suggestion,
-  type ImageStyle,
 } from "@/lib/linkedin.functions";
 import { getProfile, updateProfile } from "@/lib/profile.functions";
 import {
@@ -39,7 +40,9 @@ type Status =
   | { kind: "idle" }
   | { kind: "generating" }
   | { kind: "generating-hooks" }
-  | { kind: "generating-image" }
+  | { kind: "brainstorming" }
+  | { kind: "searching-images" }
+  | { kind: "fetching-image" }
   | { kind: "scoring" }
   | { kind: "rewriting" }
   | { kind: "saving" }
@@ -61,16 +64,6 @@ const STYLE_OPTIONS: { value: WritingStyle; label: string }[] = [
 ];
 
 const LENGTH_PRESETS = [500, 1000, 1500, 2000, 2500, 3000] as const;
-
-const IMAGE_STYLE_OPTIONS: { value: ImageStyle; label: string }[] = [
-  { value: "editorial", label: "Editorial" },
-  { value: "photo", label: "Photo" },
-  { value: "illustration", label: "Illustration" },
-  { value: "3d", label: "3D" },
-  { value: "icons", label: "Icons" },
-  { value: "minimal", label: "Minimal" },
-  { value: "corporate", label: "Corporate" },
-];
 
 const SUGGESTIONS: { value: Suggestion; label: string }[] = [
   { value: "more-emotional", label: "More emotional" },
