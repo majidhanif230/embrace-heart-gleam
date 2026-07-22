@@ -621,43 +621,57 @@ function Studio() {
             <div className="border-t border-border pt-8">
               <Label>Image <span className="normal-case tracking-normal text-muted-foreground/70">(optional)</span></Label>
               <div className="mt-3 inline-flex border border-border">
-                {(["ai", "upload"] as const).map((m) => (
+                {(["search", "upload"] as const).map((m) => (
                   <button key={m} type="button" onClick={() => setImageMode(m)} disabled={busy}
                     className={`px-4 py-2 text-xs uppercase tracking-widest ${
                       imageMode === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
-                    }`}>{m === "ai" ? "Generate with AI" : "Upload"}</button>
+                    }`}>{m === "search" ? "Search web" : "Upload"}</button>
                 ))}
               </div>
 
-              {imageMode === "ai" && (
-                <div className="mt-4">
-                  <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Style</p>
-                  <div className="flex flex-wrap gap-2">
-                    {IMAGE_STYLE_OPTIONS.map((o) => (
-                      <button key={o.value} type="button" onClick={() => setImageStyle(o.value)} disabled={busy}
-                        className={`px-3 py-1.5 text-xs uppercase tracking-widest border ${
-                          imageStyle === o.value ? "bg-foreground text-background border-foreground"
-                            : "border-border text-muted-foreground hover:text-foreground"
-                        }`}>{o.label}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-wrap items-start gap-4">
-                {image && (
+              {image && (
+                <div className="mt-4 flex flex-wrap items-start gap-4">
                   <div className="relative h-32 w-32 overflow-hidden border border-border">
                     <img src={image.previewUrl} alt={image.filename} className="h-full w-full object-cover" />
                     <button type="button" onClick={removeImage} disabled={busy} aria-label="Remove image"
                       className="absolute right-0 top-0 bg-background/90 px-2 py-0.5 text-xs hover:text-accent">×</button>
                   </div>
-                )}
-                {imageMode === "ai" ? (
-                  <button type="button" onClick={onGenerateImage} disabled={busy || !topic.trim()}
-                    className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                    {status.kind === "generating-image" ? "Generating image…" : image ? "Regenerate image" : "Generate image"}
-                  </button>
-                ) : (
+                  <p className="text-xs text-muted-foreground">Selected: <span className="text-foreground">{image.filename}</span></p>
+                </div>
+              )}
+
+              {imageMode === "search" ? (
+                <div className="mt-4 space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <input type="text" value={imageQuery}
+                      onChange={(e) => setImageQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSearchImages(); } }}
+                      placeholder={topic ? `Search images (default: "${topic.slice(0, 40)}")` : "Search the web for images…"}
+                      disabled={busy}
+                      className="flex-1 min-w-[200px] border border-border bg-transparent px-3 py-2 text-sm focus:border-accent focus:outline-none disabled:opacity-50" />
+                    <button type="button" onClick={onSearchImages} disabled={busy || (!imageQuery.trim() && !topic.trim())}
+                      className="border border-border px-4 py-2 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                      {status.kind === "searching-images" ? "Searching…" : "Search"}
+                    </button>
+                  </div>
+                  {imageResults.length > 0 && (
+                    <>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Click an image to attach it. Results from Openverse (CC-licensed).</p>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {imageResults.map((r) => (
+                          <button key={r.id} type="button" onClick={() => onChooseWebImage(r)} disabled={busy}
+                            title={r.title || "image"}
+                            className="group relative aspect-square overflow-hidden border border-border hover:border-accent disabled:cursor-not-allowed disabled:opacity-40">
+                            <img src={r.thumbnail} alt={r.title || ""} loading="lazy" className="h-full w-full object-cover transition group-hover:opacity-80" />
+                          </button>
+                        ))}
+                      </div>
+                      {status.kind === "fetching-image" && <p className="text-xs text-muted-foreground">Attaching image…</p>}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-4">
                   <label className={`flex cursor-pointer items-center border border-dashed border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground hover:border-accent hover:text-accent ${busy ? "pointer-events-none opacity-50" : ""}`}>
                     {image ? "Replace image" : "Choose file"}
                     <input ref={fileInputRef} type="file"
@@ -666,8 +680,8 @@ function Studio() {
                       onChange={(e) => onImageSelected(e.target.files)}
                       disabled={busy}/>
                   </label>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Publish / Schedule / Save */}
