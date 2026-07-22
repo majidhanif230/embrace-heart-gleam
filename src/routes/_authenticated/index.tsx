@@ -963,10 +963,10 @@ function Studio() {
 
       {/* Voice notes modal */}
       {voiceOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
           onClick={() => setVoiceOpen(false)}>
-          <div className="w-full max-w-lg border border-border bg-card p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-serif text-2xl">Your writing voice</h2>
+          <div className="glass-strong glow-primary w-full max-w-lg rounded-2xl p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-serif text-2xl font-bold">🎙 Your writing <span className="text-gradient">voice</span></h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Describe how you write. The AI matches this style on every post.
             </p>
@@ -976,11 +976,11 @@ function Studio() {
               rows={8}
               maxLength={2000}
               placeholder="e.g. Educational, conversational, technical. I rarely use emojis. I prefer clean formatting, short paragraphs, and concrete examples over abstract advice."
-              className="mt-4 w-full border border-border bg-transparent p-3 text-sm focus:border-accent focus:outline-none"
+              className="mt-4 w-full rounded-xl border border-border bg-background/40 p-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <div className="mt-4 flex justify-end gap-2 text-xs uppercase tracking-widest">
-              <button onClick={() => setVoiceOpen(false)} className="px-4 py-2 text-muted-foreground hover:text-foreground">Cancel</button>
-              <button onClick={saveVoice} className="bg-accent px-4 py-2 text-accent-foreground hover:opacity-90">Save</button>
+              <button onClick={() => setVoiceOpen(false)} className="rounded-lg px-4 py-2 text-muted-foreground hover:text-foreground">Cancel</button>
+              <button onClick={saveVoice} className="rounded-lg gradient-primary px-4 py-2 font-semibold text-primary-foreground transition hover:brightness-110">Save</button>
             </div>
           </div>
         </div>
@@ -988,12 +988,12 @@ function Studio() {
 
       {/* Knowledge base modal */}
       {knowledgeOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/90 p-4"
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 backdrop-blur-sm p-4"
           onClick={() => { setKnowledgeOpen(false); resetKbForm(); }}>
-          <div className="my-8 w-full max-w-3xl border border-border bg-card p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="glass-strong glow-primary my-8 w-full max-w-3xl rounded-2xl p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-serif text-2xl">Your knowledge base</h2>
+                <h2 className="font-serif text-2xl font-bold">📚 Your <span className="text-gradient">knowledge base</span></h2>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Save your expertise, projects, opinions, and lessons. The AI uses these notes to suggest topics you're uniquely qualified to write about.
                 </p>
@@ -1007,8 +1007,8 @@ function Studio() {
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   {kbEditingId ? "Edit entry" : "Add new entry"}
                 </p>
-                <label className={`flex cursor-pointer items-center justify-center border border-dashed border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground hover:border-accent hover:text-accent ${status.kind === "extracting-file" ? "pointer-events-none opacity-50" : ""}`}>
-                  {status.kind === "extracting-file" ? "Extracting…" : "Import file (image · PDF · DOCX · PPTX)"}
+                <label className={`flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border bg-background/40 px-4 py-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground transition hover:border-primary hover:bg-white/5 hover:text-foreground ${status.kind === "extracting-file" ? "pointer-events-none opacity-50" : ""}`}>
+                  {status.kind === "extracting-file" ? "Extracting…" : "📎 Import file (image · PDF · DOCX · PPTX)"}
                   <input
                     type="file"
                     accept="image/*,application/pdf,.pdf,.docx,.pptx,.txt,.md,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -1021,26 +1021,26 @@ function Studio() {
                 <input type="text" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)}
                   placeholder="Title (optional) — e.g. Lessons from scaling a fintech to 10M users"
                   maxLength={200}
-                  className="w-full border border-border bg-transparent px-3 py-2 text-sm focus:border-accent focus:outline-none" />
+                  className="w-full rounded-xl border border-border bg-background/40 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 <textarea value={kbContent} onChange={(e) => setKbContent(e.target.value)}
                   rows={10} maxLength={20000}
                   placeholder="Paste notes, project details, opinions, frameworks, mistakes, industry observations… anything you might want to write a post about."
-                  className="w-full resize-y border border-border bg-transparent p-3 text-sm focus:border-accent focus:outline-none" />
+                  className="w-full resize-y rounded-xl border border-border bg-background/40 p-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">{kbContent.length} / 20000</span>
                   <div className="flex gap-2 uppercase tracking-widest">
                     {kbEditingId && (
-                      <button onClick={resetKbForm} className="px-3 py-1.5 text-muted-foreground hover:text-foreground">Cancel</button>
+                      <button onClick={resetKbForm} className="rounded-lg px-3 py-1.5 text-muted-foreground hover:text-foreground">Cancel</button>
                     )}
                     <button onClick={onSaveKnowledge} disabled={!kbContent.trim()}
-                      className="bg-accent px-4 py-1.5 text-accent-foreground hover:opacity-90 disabled:opacity-40">
+                      className="rounded-lg gradient-primary px-4 py-1.5 font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-40">
                       {kbEditingId ? "Update" : "Add"}
                     </button>
                   </div>
                 </div>
                 <button onClick={onSuggestFromKnowledge} disabled={busy || knowledge.length === 0}
-                  className="mt-2 w-full border border-border px-4 py-2 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-                  {status.kind === "suggesting-from-kb" ? "Reading your notes…" : "AI: suggest topics from my knowledge"}
+                  className="mt-2 w-full rounded-xl gradient-viral px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+                  {status.kind === "suggesting-from-kb" ? "Reading your notes…" : "✨ AI: suggest topics from my knowledge"}
                 </button>
               </div>
 
@@ -1052,11 +1052,11 @@ function Studio() {
                   <p className="text-xs text-muted-foreground">No entries yet. Add your first note on the left.</p>
                 )}
                 {knowledge.map((k) => (
-                  <div key={k.id} className={`border p-3 ${kbEditingId === k.id ? "border-accent" : "border-border"}`}>
+                  <div key={k.id} className={`rounded-xl border p-3 transition ${kbEditingId === k.id ? "border-primary bg-primary/5" : "border-border bg-white/5 hover:bg-white/10"}`}>
                     <p className="line-clamp-1 text-sm font-medium">{k.title || "Untitled"}</p>
                     <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-muted-foreground">{k.content}</p>
                     <div className="mt-2 flex gap-3 text-[10px] uppercase tracking-widest">
-                      <button onClick={() => onEditKnowledge(k)} className="text-muted-foreground hover:text-accent">Edit</button>
+                      <button onClick={() => onEditKnowledge(k)} className="text-muted-foreground hover:text-primary">Edit</button>
                       <button onClick={() => onDeleteKnowledge(k.id)} className="text-muted-foreground hover:text-destructive">Delete</button>
                     </div>
                   </div>
@@ -1074,19 +1074,22 @@ function DraftCard({ draft, active, onOpen, onDelete }: {
   draft: DraftRow; active: boolean; onOpen: () => void; onDelete: () => void;
 }) {
   return (
-    <div className={`border p-3 ${active ? "border-accent" : "border-border"}`}>
+    <div className={`glass rounded-xl p-3 transition hover:bg-white/10 ${active ? "ring-2 ring-primary" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <p className="line-clamp-1 flex-1 text-xs font-medium">{draft.topic || "Untitled"}</p>
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          {draft.status === "published" ? "Sent" : draft.status === "failed" ? "Failed" : ""}
-        </span>
+        {draft.status === "published" && (
+          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-emerald-300">✓ Sent</span>
+        )}
+        {draft.status === "failed" && (
+          <span className="rounded-full bg-destructive/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-destructive">Failed</span>
+        )}
       </div>
       <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs text-muted-foreground">
         {draft.content.slice(0, 140) || "—"}
       </p>
       {draft.error_message && <p className="mt-1 text-xs text-destructive">{draft.error_message}</p>}
       <div className="mt-2 flex gap-3 text-[10px] uppercase tracking-widest">
-        <button onClick={onOpen} className="text-muted-foreground hover:text-accent">Open</button>
+        <button onClick={onOpen} className="text-muted-foreground hover:text-primary">Open</button>
         <button onClick={onDelete} className="text-muted-foreground hover:text-destructive">Delete</button>
       </div>
     </div>
@@ -1095,18 +1098,23 @@ function DraftCard({ draft, active, onOpen, onDelete }: {
 
 function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
   return (
-    <label htmlFor={htmlFor} className="mb-2 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+    <label htmlFor={htmlFor} className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
       {children}
     </label>
   );
 }
 
 function ScoreCell({ label, v, bold }: { label: string; v: number; bold?: boolean }) {
-  const color = v >= 8 ? "text-accent" : v >= 6 ? "text-foreground" : "text-red-600";
+  const color = v >= 8 ? "text-emerald-400" : v >= 6 ? "text-foreground" : "text-destructive";
+  const barColor = v >= 8 ? "bg-emerald-400" : v >= 6 ? "gradient-primary" : "bg-destructive";
+  const pct = Math.max(0, Math.min(100, v * 10));
   return (
-    <div>
-      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
-      <p className={`${bold ? "font-semibold" : ""} ${color} text-lg`}>{v.toFixed(1)}</p>
+    <div className="space-y-1">
+      <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className={`${bold ? "font-bold" : "font-semibold"} ${color} text-xl`}>{v.toFixed(1)}<span className="ml-0.5 text-xs text-muted-foreground">/10</span></p>
+      <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
@@ -1114,23 +1122,24 @@ function ScoreCell({ label, v, bold }: { label: string; v: number; bold?: boolea
 function LinkedInPreview({ text, imageUrl, mode }: { text: string; imageUrl: string | null; mode: "desktop" | "mobile" }) {
   const width = mode === "mobile" ? "w-[320px] max-w-full mx-auto text-[13px]" : "w-full";
   return (
-    <div className={`${width} border border-border bg-card overflow-hidden`}>
-      <div className="flex items-center gap-3 border-b border-border p-3">
-        <div className="h-10 w-10 rounded-full bg-muted" />
+    <div className={`${width} overflow-hidden rounded-2xl border border-border bg-white text-neutral-900 shadow-2xl shadow-black/40`}>
+      <div className="flex items-center gap-3 border-b border-neutral-200 p-3">
+        <div className="h-10 w-10 rounded-full gradient-viral" />
         <div className="flex-1">
           <p className="text-sm font-medium">Your Name</p>
-          <p className="text-xs text-muted-foreground">Your headline · Now</p>
+          <p className="text-xs text-neutral-500">Your headline · Now</p>
         </div>
+        <span className="text-xs text-neutral-400">•••</span>
       </div>
       <div className="whitespace-pre-wrap px-3 py-3 text-sm leading-relaxed">
-        {text || <span className="text-muted-foreground">Your post preview will appear here.</span>}
+        {text || <span className="text-neutral-400">Your post preview will appear here.</span>}
       </div>
       {imageUrl && (
-        <div className="border-t border-border">
+        <div className="border-t border-neutral-200">
           <img src={imageUrl} alt="" className="w-full object-cover" />
         </div>
       )}
-      <div className="flex justify-between border-t border-border px-3 py-2 text-xs text-muted-foreground">
+      <div className="flex justify-between border-t border-neutral-200 px-3 py-2 text-xs text-neutral-500">
         <span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span>
       </div>
     </div>
@@ -1138,12 +1147,13 @@ function LinkedInPreview({ text, imageUrl, mode }: { text: string; imageUrl: str
 }
 
 function StatusLine({ status }: { status: Status }) {
-  if (status.kind === "idle") return <p className="text-sm text-muted-foreground">Ready.</p>;
-  if (status.kind === "error") return <p className="text-sm text-destructive break-words">Error: {status.message}</p>;
+  const pill = "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium";
+  if (status.kind === "idle") return <p className={`${pill} bg-white/5 text-muted-foreground`}><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" /> Ready</p>;
+  if (status.kind === "error") return <p className={`${pill} bg-destructive/15 text-destructive break-words`}><span className="h-1.5 w-1.5 rounded-full bg-destructive" /> Error: {status.message}</p>;
   if (status.kind === "success") return (
-    <p className="text-sm"><span className="text-accent">●</span> {status.postId ? `Published · ${status.postId}` : "Done"}</p>
+    <p className={`${pill} bg-emerald-500/15 text-emerald-300`}><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> {status.postId ? `Published · ${status.postId}` : "Done"}</p>
   );
-  if (status.kind === "ready") return <p className="text-sm"><span className="text-accent">●</span> Ready to publish</p>;
+  if (status.kind === "ready") return <p className={`${pill} gradient-primary text-primary-foreground`}><span className="h-1.5 w-1.5 rounded-full bg-white" /> Ready to publish</p>;
   const labels: Record<string, string> = {
     generating: "Generating 3 drafts…",
     "generating-hooks": "Finding hooks…",
@@ -1158,5 +1168,5 @@ function StatusLine({ status }: { status: Status }) {
     scheduling: "Scheduling…",
     publishing: "Publishing to LinkedIn…",
   };
-  return <p className="text-sm text-muted-foreground">{labels[status.kind]}</p>;
+  return <p className={`${pill} bg-primary/15 text-primary`}><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> {labels[status.kind]}</p>;
 }
