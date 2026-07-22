@@ -993,6 +993,17 @@ function Studio() {
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   {kbEditingId ? "Edit entry" : "Add new entry"}
                 </p>
+                <label className={`flex cursor-pointer items-center justify-center border border-dashed border-border px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground hover:border-accent hover:text-accent ${status.kind === "extracting-file" ? "pointer-events-none opacity-50" : ""}`}>
+                  {status.kind === "extracting-file" ? "Extracting…" : "Import file (image · PDF · DOCX · PPTX)"}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,.pdf,.docx,.pptx,.txt,.md,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    className="hidden"
+                    onChange={(e) => { onKnowledgeFileSelected(e.target.files); e.currentTarget.value = ""; }}
+                    disabled={status.kind === "extracting-file"}
+                  />
+                </label>
+                <p className="text-[10px] text-muted-foreground">Drop a slide deck, PDF, Word doc, or image — the AI extracts text into notes you can edit below.</p>
                 <input type="text" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)}
                   placeholder="Title (optional) — e.g. Lessons from scaling a fintech to 10M users"
                   maxLength={200}
@@ -1126,6 +1137,7 @@ function StatusLine({ status }: { status: Status }) {
     "suggesting-from-kb": "Reading your knowledge base…",
     "searching-images": "Searching images…",
     "fetching-image": "Attaching image…",
+    "extracting-file": "Extracting file…",
     scoring: "Scoring…",
     rewriting: "Rewriting…",
     saving: "Saving draft…",
