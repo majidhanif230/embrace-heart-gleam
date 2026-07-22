@@ -18,6 +18,7 @@ import {
   upsertKnowledge,
   deleteKnowledge,
   suggestTopicsFromKnowledge,
+  extractKnowledgeFromFile,
 } from "@/lib/knowledge.functions";
 import {
   listDrafts,
@@ -50,6 +51,7 @@ type Status =
   | { kind: "suggesting-from-kb" }
   | { kind: "searching-images" }
   | { kind: "fetching-image" }
+  | { kind: "extracting-file" }
   | { kind: "scoring" }
   | { kind: "rewriting" }
   | { kind: "saving" }
