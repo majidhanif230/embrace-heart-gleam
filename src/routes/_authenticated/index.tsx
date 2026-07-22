@@ -1071,6 +1071,7 @@ function StatusLine({ status }: { status: Status }) {
     generating: "Generating 3 drafts…",
     "generating-hooks": "Finding hooks…",
     brainstorming: "Brainstorming ideas…",
+    "suggesting-from-kb": "Reading your knowledge base…",
     "searching-images": "Searching images…",
     "fetching-image": "Attaching image…",
     scoring: "Scoring…",
