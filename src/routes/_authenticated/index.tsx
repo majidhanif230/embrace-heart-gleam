@@ -521,16 +521,54 @@ function Studio() {
               </div>
             </div>
 
+            <div>
+              <Label htmlFor="instructions">Custom Prompt <span className="normal-case tracking-normal text-muted-foreground/70">(optional — extra instructions the AI must follow)</span></Label>
+              <textarea
+                id="instructions" value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="e.g. Include a real example from fintech. Avoid buzzwords. End with a question about hiring."
+                disabled={busy} rows={3}
+                className="w-full resize-y border border-border bg-transparent p-3 text-sm placeholder:text-muted-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+              />
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <button onClick={() => onGenerate()} disabled={busy || !topic.trim()}
                 className="bg-primary px-6 py-3 text-sm font-medium uppercase tracking-widest text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
                 {status.kind === "generating" ? "Generating 3 drafts…" : "Generate 3 drafts"}
+              </button>
+              <button onClick={onBrainstorm} disabled={busy || (!topic.trim() && !customInstructions.trim())}
+                className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                {status.kind === "brainstorming" ? "Brainstorming…" : "Brainstorm ideas"}
               </button>
               <button onClick={onSuggestHooks} disabled={busy || !topic.trim()}
                 className="border border-border px-4 py-3 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
                 {status.kind === "generating-hooks" ? "Finding hooks…" : "Suggest hooks"}
               </button>
             </div>
+
+            {brainstormOpen && ideas.length > 0 && (
+              <div className="border border-border p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea board</p>
+                  <div className="flex gap-3 text-[10px] uppercase tracking-widest">
+                    <button onClick={onBrainstorm} disabled={busy} className="text-muted-foreground hover:text-accent">Regenerate</button>
+                    <button onClick={() => setBrainstormOpen(false)} className="text-muted-foreground hover:text-foreground">Close</button>
+                  </div>
+                </div>
+                <ul className="space-y-2">
+                  {ideas.map((idea, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-1 text-muted-foreground text-xs">{i + 1}.</span>
+                      <button type="button" onClick={() => { setTopic(idea); setBrainstormOpen(false); }} disabled={busy}
+                        className="flex-1 text-left text-sm hover:text-accent">
+                        {idea}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {hooks.length > 0 && (
               <div className="border border-border p-4">
