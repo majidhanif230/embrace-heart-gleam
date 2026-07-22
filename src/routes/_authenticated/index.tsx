@@ -181,8 +181,14 @@ function Studio() {
   const [score, setScore] = useState<Score | null>(null);
   const [companies, setCompanies] = useState<string[]>([]);
   const [image, setImage] = useState<PendingImage | null>(null);
-  const [imageMode, setImageMode] = useState<"ai" | "upload">("ai");
-  const [imageStyle, setImageStyle] = useState<ImageStyle>("editorial");
+  const [imageMode, setImageMode] = useState<"search" | "upload">("search");
+  const [imageQuery, setImageQuery] = useState("");
+  const [imageResults, setImageResults] = useState<Array<{
+    id: string; title: string; url: string; thumbnail: string; creator: string; source: string; license: string; landing: string;
+  }>>([]);
+  const [ideas, setIdeas] = useState<string[]>([]);
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [brainstormOpen, setBrainstormOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
@@ -392,16 +398,48 @@ function Studio() {
 
   const removeImage = () => { if (image) URL.revokeObjectURL(image.previewUrl); setImage(null); };
 
-  const onGenerateImage = async () => {
-    if (!topic.trim()) { setStatus({ kind: "error", message: "Enter a topic first." }); return; }
-    setStatus({ kind: "generating-image" });
+  const onSearchImages = async () => {
+    const q = (imageQuery || topic).trim();
+    if (!q) { setStatus({ kind: "error", message: "Enter a search query or topic." }); return; }
+    setStatus({ kind: "searching-images" });
     try {
-      const res = await generateImage({ data: { topic: topic.trim(), style: imageStyle } });
+      const res = await searchImages({ data: { query: q, page: 1 } });
+      setImageResults(res.results);
+      setStatus(post.trim() ? { kind: "ready" } : { kind: "idle" });
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const onChooseWebImage = async (r: { url: string; title: string; thumbnail: string }) => {
+    setStatus({ kind: "fetching-image" });
+    try {
+      // Try full URL first; if it fails, fall back to thumbnail.
+      let res;
+      try {
+        res = await fetchImageAsBase64({ data: { url: r.url, filename: (r.title || "web-image").slice(0, 60) } });
+      } catch {
+        res = await fetchImageAsBase64({ data: { url: r.thumbnail, filename: (r.title || "web-image").slice(0, 60) } });
+      }
       if (image) URL.revokeObjectURL(image.previewUrl);
       setImage({
         filename: res.filename, mimeType: res.mimeType, dataBase64: res.dataBase64,
         previewUrl: base64ToPreviewUrl(res.dataBase64, res.mimeType),
       });
+      setStatus(post.trim() ? { kind: "ready" } : { kind: "idle" });
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const onBrainstorm = async () => {
+    const seed = (topic || customInstructions).trim();
+    if (!seed) { setStatus({ kind: "error", message: "Type a niche, seed, or question first." }); return; }
+    setStatus({ kind: "brainstorming" });
+    try {
+      const res = await brainstormTopics({ data: { seed, style, voiceNotes } });
+      setIdeas(res.ideas);
+      setBrainstormOpen(true);
       setStatus(post.trim() ? { kind: "ready" } : { kind: "idle" });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : "Failed" });
