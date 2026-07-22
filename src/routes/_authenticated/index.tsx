@@ -919,6 +919,76 @@ function Studio() {
           </div>
         </div>
       )}
+
+      {/* Knowledge base modal */}
+      {knowledgeOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/90 p-4"
+          onClick={() => { setKnowledgeOpen(false); resetKbForm(); }}>
+          <div className="my-8 w-full max-w-3xl border border-border bg-card p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-serif text-2xl">Your knowledge base</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Save your expertise, projects, opinions, and lessons. The AI uses these notes to suggest topics you're uniquely qualified to write about.
+                </p>
+              </div>
+              <button onClick={() => { setKnowledgeOpen(false); resetKbForm(); }}
+                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">Close</button>
+            </div>
+
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div className="space-y-3">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {kbEditingId ? "Edit entry" : "Add new entry"}
+                </p>
+                <input type="text" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)}
+                  placeholder="Title (optional) — e.g. Lessons from scaling a fintech to 10M users"
+                  maxLength={200}
+                  className="w-full border border-border bg-transparent px-3 py-2 text-sm focus:border-accent focus:outline-none" />
+                <textarea value={kbContent} onChange={(e) => setKbContent(e.target.value)}
+                  rows={10} maxLength={20000}
+                  placeholder="Paste notes, project details, opinions, frameworks, mistakes, industry observations… anything you might want to write a post about."
+                  className="w-full resize-y border border-border bg-transparent p-3 text-sm focus:border-accent focus:outline-none" />
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{kbContent.length} / 20000</span>
+                  <div className="flex gap-2 uppercase tracking-widest">
+                    {kbEditingId && (
+                      <button onClick={resetKbForm} className="px-3 py-1.5 text-muted-foreground hover:text-foreground">Cancel</button>
+                    )}
+                    <button onClick={onSaveKnowledge} disabled={!kbContent.trim()}
+                      className="bg-accent px-4 py-1.5 text-accent-foreground hover:opacity-90 disabled:opacity-40">
+                      {kbEditingId ? "Update" : "Add"}
+                    </button>
+                  </div>
+                </div>
+                <button onClick={onSuggestFromKnowledge} disabled={busy || knowledge.length === 0}
+                  className="mt-2 w-full border border-border px-4 py-2 text-xs font-medium uppercase tracking-widest hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
+                  {status.kind === "suggesting-from-kb" ? "Reading your notes…" : "AI: suggest topics from my knowledge"}
+                </button>
+              </div>
+
+              <div className="space-y-2 md:max-h-[70vh] md:overflow-y-auto">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Saved entries · {knowledge.length}
+                </p>
+                {knowledge.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No entries yet. Add your first note on the left.</p>
+                )}
+                {knowledge.map((k) => (
+                  <div key={k.id} className={`border p-3 ${kbEditingId === k.id ? "border-accent" : "border-border"}`}>
+                    <p className="line-clamp-1 text-sm font-medium">{k.title || "Untitled"}</p>
+                    <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-muted-foreground">{k.content}</p>
+                    <div className="mt-2 flex gap-3 text-[10px] uppercase tracking-widest">
+                      <button onClick={() => onEditKnowledge(k)} className="text-muted-foreground hover:text-accent">Edit</button>
+                      <button onClick={() => onDeleteKnowledge(k.id)} className="text-muted-foreground hover:text-destructive">Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
