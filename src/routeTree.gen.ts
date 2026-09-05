@@ -16,6 +16,7 @@ import { Route as ApiPublicLinkedinLogoutRouteImport } from './routes/api/public
 import { Route as ApiPublicLinkedinLoginRouteImport } from './routes/api/public/linkedin/login'
 import { Route as ApiPublicLinkedinCallbackRouteImport } from './routes/api/public/linkedin/callback'
 import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
+import { Route as ApiPublicHooksAutopilotRouteImport } from './routes/api/public/hooks/autopilot'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -53,10 +54,16 @@ const ApiPublicHooksPublishScheduledRoute =
     path: '/api/public/hooks/publish-scheduled',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksAutopilotRoute = ApiPublicHooksAutopilotRouteImport.update({
+  id: '/api/public/hooks/autopilot',
+  path: '/api/public/hooks/autopilot',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/api/public/hooks/autopilot': typeof ApiPublicHooksAutopilotRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/linkedin/callback': typeof ApiPublicLinkedinCallbackRoute
   '/api/public/linkedin/login': typeof ApiPublicLinkedinLoginRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/autopilot': typeof ApiPublicHooksAutopilotRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/linkedin/callback': typeof ApiPublicLinkedinCallbackRoute
   '/api/public/linkedin/login': typeof ApiPublicLinkedinLoginRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/autopilot': typeof ApiPublicHooksAutopilotRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/linkedin/callback': typeof ApiPublicLinkedinCallbackRoute
   '/api/public/linkedin/login': typeof ApiPublicLinkedinLoginRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/api/public/hooks/autopilot'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/linkedin/callback'
     | '/api/public/linkedin/login'
@@ -93,6 +103,7 @@ export interface FileRouteTypes {
   to:
     | '/auth'
     | '/'
+    | '/api/public/hooks/autopilot'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/linkedin/callback'
     | '/api/public/linkedin/login'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/'
+    | '/api/public/hooks/autopilot'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/linkedin/callback'
     | '/api/public/linkedin/login'
@@ -111,6 +123,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicHooksAutopilotRoute: typeof ApiPublicHooksAutopilotRoute
   ApiPublicHooksPublishScheduledRoute: typeof ApiPublicHooksPublishScheduledRoute
   ApiPublicLinkedinCallbackRoute: typeof ApiPublicLinkedinCallbackRoute
   ApiPublicLinkedinLoginRoute: typeof ApiPublicLinkedinLoginRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishScheduledRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/autopilot': {
+      id: '/api/public/hooks/autopilot'
+      path: '/api/public/hooks/autopilot'
+      fullPath: '/api/public/hooks/autopilot'
+      preLoaderRoute: typeof ApiPublicHooksAutopilotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -185,6 +205,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicHooksAutopilotRoute: ApiPublicHooksAutopilotRoute,
   ApiPublicHooksPublishScheduledRoute: ApiPublicHooksPublishScheduledRoute,
   ApiPublicLinkedinCallbackRoute: ApiPublicLinkedinCallbackRoute,
   ApiPublicLinkedinLoginRoute: ApiPublicLinkedinLoginRoute,
