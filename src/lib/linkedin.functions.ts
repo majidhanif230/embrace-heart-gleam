@@ -1,7 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { generateText } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import {
+  createAiProvider,
+  requireAiApiKey,
+  AI_TEXT_MODEL,
+  AI_IMAGE_MODEL,
+  AI_NATIVE_BASE_URL,
+} from "./ai-gateway.server";
 import { requireLinkedInSession } from "./session";
 
 // Convert ASCII letters/digits inside **...** spans into Unicode
@@ -134,10 +140,9 @@ export const generatePostVariants = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
-    const gateway = createLovableAiGatewayProvider(key);
-    const model = gateway("google/gemini-3-flash-preview");
+    const key = requireAiApiKey();
+    const gateway = createAiProvider(key);
+    const model = gateway(AI_TEXT_MODEL);
     const companies = detectCompanies(data.topic);
 
     const variantNotes = [
@@ -173,9 +178,8 @@ export const generateHooks = createServerFn({ method: "POST" })
     z.object({ topic: z.string().min(1).max(500), style: StyleEnum }).parse(input),
   )
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
-    const gateway = createLovableAiGatewayProvider(key);
+    const key = requireAiApiKey();
+    const gateway = createAiProvider(key);
     const prompt = `Generate 5 distinct scroll-stopping LinkedIn post opening lines (hooks) for this topic.
 
 TOPIC: ${data.topic}
@@ -187,7 +191,7 @@ Rules:
 - No hashtags, no emojis, no quotes around the text.
 - Return as a plain numbered list "1.", "2.", ... — one hook per line, nothing else.`;
     const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
+      model: gateway(AI_TEXT_MODEL),
       prompt,
     });
     const hooks = text
@@ -202,9 +206,8 @@ Rules:
 export const scorePost = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ text: z.string().min(1).max(4000) }).parse(input))
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
-    const gateway = createLovableAiGatewayProvider(key);
+    const key = requireAiApiKey();
+    const gateway = createAiProvider(key);
     const prompt = `Score this LinkedIn post on 5 dimensions from 0 to 10 (one decimal allowed). Be honest, not generous.
 
 POST:
@@ -215,7 +218,7 @@ ${data.text}
 Return ONLY strict JSON, no prose:
 {"hook": number, "readability": number, "virality": number, "professionalTone": number, "cta": number, "overall": number, "notes": "one short sentence"}`;
     const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
+      model: gateway(AI_TEXT_MODEL),
       prompt,
     });
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -265,9 +268,8 @@ export const applySuggestion = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
-    const gateway = createLovableAiGatewayProvider(key);
+    const key = requireAiApiKey();
+    const gateway = createAiProvider(key);
     const prompt = `Rewrite this LinkedIn post following the instruction. Keep the same LinkedIn structure (hook / body / soft CTA / hashtags). Wrap the hook line and 1–2 body key phrases in **double asterisks** for bold. Total length must fit within ${data.targetChars} characters. Output ONLY the rewritten post text.
 
 INSTRUCTION: ${SUGGESTIONS[data.suggestion]}
@@ -277,7 +279,7 @@ ORIGINAL POST:
 ${data.text}
 """`;
     const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
+      model: gateway(AI_TEXT_MODEL),
       prompt,
     });
     return { text: toUnicodeBold(text.trim()) };
@@ -313,13 +315,12 @@ export const generateImage = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+    const key = requireAiApiKey();
     // Improve the raw topic into a detailed image prompt.
-    const gateway = createLovableAiGatewayProvider(key);
+    const gateway = createAiProvider(key);
     const styleHint = IMAGE_STYLES[data.style];
     const { text: improved } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
+      model: gateway(AI_TEXT_MODEL),
       prompt: `Write ONE detailed image-generation prompt (2–3 sentences, under 400 chars) for a LinkedIn cover image.
 
 TOPIC: ${data.topic}
@@ -329,23 +330,33 @@ Rules: no text or typography in the image, no logos, no watermarks, no faces of 
     });
     const prompt = `${improved.trim()} Style: ${styleHint}. No text overlay. No logos. No watermarks. Suitable for LinkedIn.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+    // Gemini exposes image generation only on the native endpoint, as an
+    // inline_data part on a normal generateContent response.
+    const res = await fetch(`${AI_NATIVE_BASE_URL}/models/${AI_IMAGE_MODEL}:generateContent`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-image-2",
-        prompt,
-        quality: "low",
-        size: "1024x1024",
-        n: 1,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ["IMAGE"] },
       }),
     });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Image generation failed [${res.status}]: ${body}`);
+      // Gemini's free tier allows zero image-model requests, so a 429 here is
+      // almost always "billing not enabled" rather than a burst rate limit.
+      const hint =
+        res.status === 429
+          ? " — Gemini image generation requires a Google AI Studio project with billing enabled."
+          : "";
+      throw new Error(`Image generation failed [${res.status}]${hint}: ${body.slice(0, 300)}`);
     }
-    const json = (await res.json()) as { data?: Array<{ b64_json?: string }> };
-    const b64 = json.data?.[0]?.b64_json;
+    const json = (await res.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> };
+      }>;
+    };
+    const b64 = (json.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData?.data)
+      ?.inlineData?.data;
     if (!b64) throw new Error("Image generation returned no image data");
     return { dataBase64: b64, mimeType: "image/png" as const, filename: "ai-generated.png", prompt };
   });
@@ -360,9 +371,8 @@ export const brainstormTopics = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
-    const gateway = createLovableAiGatewayProvider(key);
+    const key = requireAiApiKey();
+    const gateway = createAiProvider(key);
     const prompt = `You are a LinkedIn content strategist. Brainstorm 8 SHARP post ideas around this seed. Each idea should be scroll-stopping and specific — not a generic listicle.
 
 SEED / NICHE / QUESTION: ${data.seed}
@@ -373,7 +383,7 @@ Rules:
 - No hashtags, no quotes, no numbering in the sentence itself.
 - Return as a plain numbered list "1.", "2.", ... one per line. Nothing else.`;
     const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
+      model: gateway(AI_TEXT_MODEL),
       prompt,
     });
     const ideas = text

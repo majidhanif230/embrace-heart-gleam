@@ -1,6 +1,6 @@
 // Server-only helpers for Autopilot: find a trending topic, write a post, publish it.
 import { generateText } from "ai";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { createAiProvider, requireAiApiKey, AI_TEXT_MODEL } from "./ai-gateway.server";
 import { publishToLinkedIn, getUserTokens } from "./linkedin-publish.server";
 
 export type AutopilotRow = {
@@ -73,9 +73,9 @@ export async function pickTrendingTopic(opts: {
   niche: string;
   recentTopics: string[];
 }): Promise<string> {
-  const gateway = createLovableAiGatewayProvider(opts.apiKey);
+  const gateway = createAiProvider(opts.apiKey);
   const { text } = await generateText({
-    model: gateway("google/gemini-3-flash-preview"),
+    model: gateway(AI_TEXT_MODEL),
     prompt: `You choose what a LinkedIn creator should post about today.
 
 NICHE / FOCUS: ${opts.niche || "technology, AI and business"}
@@ -100,10 +100,10 @@ export async function writeAutopilotPost(opts: {
   targetChars: number;
   voiceNotes?: string;
 }): Promise<string> {
-  const gateway = createLovableAiGatewayProvider(opts.apiKey);
+  const gateway = createAiProvider(opts.apiKey);
   const minChars = Math.max(150, Math.round(opts.targetChars * 0.82));
   const { text } = await generateText({
-    model: gateway("google/gemini-3-flash-preview"),
+    model: gateway(AI_TEXT_MODEL),
     prompt: `You are a top LinkedIn creator. Write ONE high-quality LinkedIn post that feels human, not AI.
 
 TOPIC (a current trending story): ${opts.topic}
@@ -133,8 +133,7 @@ Output ONLY the post text.`,
 
 /** Full one-user autopilot cycle: topic → post → publish → record draft. */
 export async function runAutopilotForUser(row: AutopilotRow): Promise<{ topic: string; postId?: string; draftId: string }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+  const apiKey = requireAiApiKey();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const { data: recent } = await supabaseAdmin

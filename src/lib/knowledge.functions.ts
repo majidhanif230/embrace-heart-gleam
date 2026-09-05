@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateText } from "ai";
 import { z } from "zod";
 import { requireLinkedInSession } from "./session";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { createAiProvider, requireAiApiKey, AI_TEXT_MODEL, AI_NATIVE_BASE_URL } from "./ai-gateway.server";
 
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -133,29 +133,34 @@ async function extractViaGeminiFile(opts: {
   const instruction = opts.kind === "image"
     ? "Extract all text visible in this image and then describe the key concepts, data, and takeaways in structured notes. Preserve any lists, tables, quotes, or numbers verbatim. Output plain text only."
     : "Read this document and produce a thorough, faithful extract as structured notes: key ideas, definitions, arguments, data points, quotes, and takeaways. Preserve numbers and lists verbatim. Output plain text only, no preamble.";
-  const content = opts.kind === "image"
-    ? [
-        { type: "text", text: instruction },
-        { type: "image_url", image_url: { url: `data:${opts.mimeType};base64,${opts.dataBase64}` } },
-      ]
-    : [
-        { type: "text", text: instruction },
-        { type: "file", file: { filename: opts.filename, file_data: `data:${opts.mimeType};base64,${opts.dataBase64}` } },
-      ];
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  // Gemini's OpenAI-compatible endpoint does not accept image or file parts, so
+  // this call goes to the native API with the bytes inlined instead.
+  const res = await fetch(`${AI_NATIVE_BASE_URL}/models/${AI_TEXT_MODEL}:generateContent`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${opts.key}`, "Content-Type": "application/json" },
+    headers: { "x-goog-api-key": opts.key, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [{ role: "user", content }],
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: instruction },
+            { inline_data: { mime_type: opts.mimeType, data: opts.dataBase64 } },
+          ],
+        },
+      ],
     }),
   });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Extraction failed [${res.status}]: ${body.slice(0, 300)}`);
   }
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return (json.choices?.[0]?.message?.content ?? "").trim();
+  const json = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  return (json.candidates?.[0]?.content?.parts ?? [])
+    .map((p) => p.text ?? "")
+    .join("")
+    .trim();
 }
 
 export const extractKnowledgeFromFile = createServerFn({ method: "POST" })
@@ -171,13 +176,11 @@ export const extractKnowledgeFromFile = createServerFn({ method: "POST" })
     let kind = "";
     if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/.test(name)) {
       kind = "image";
-      const key = process.env.LOVABLE_API_KEY;
-      if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+      const key = requireAiApiKey();
       text = await extractViaGeminiFile({ key, mimeType: mime || "image/jpeg", dataBase64: data.dataBase64, filename: data.filename, kind: "image" });
     } else if (mime === "application/pdf" || name.endsWith(".pdf")) {
       kind = "pdf";
-      const key = process.env.LOVABLE_API_KEY;
-      if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+      const key = requireAiApiKey();
       text = await extractViaGeminiFile({ key, mimeType: "application/pdf", dataBase64: data.dataBase64, filename: data.filename, kind: "pdf" });
     } else if (name.endsWith(".docx") || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
       kind = "docx";
@@ -227,9 +230,8 @@ export const suggestTopicsFromKnowledge = createServerFn({ method: "POST" })
       .join("\n\n---\n\n")
       .slice(0, 24000);
 
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
-    const gateway = createLovableAiGatewayProvider(key);
+    const key = requireAiApiKey();
+    const gateway = createAiProvider(key);
 
     const prompt = `You are a LinkedIn content strategist. Based ONLY on the user's personal knowledge base below, suggest 8 SHARP LinkedIn post topics they are uniquely qualified to write. Each topic must clearly connect to something concrete in their notes — a lesson, project, opinion, framework, mistake, or observation they've captured.
 
@@ -246,7 +248,7 @@ Rules:
 - Return as a plain numbered list "1.", "2.", ... one per line. Nothing else.`;
 
     const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
+      model: gateway(AI_TEXT_MODEL),
       prompt,
     });
     const ideas = text

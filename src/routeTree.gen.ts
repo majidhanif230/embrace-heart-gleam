@@ -9,22 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as ApiPublicLinkedinLogoutRouteImport } from './routes/api/public/linkedin/logout'
-import { Route as ApiPublicLinkedinLoginRouteImport } from './routes/api/public/linkedin/login'
-import { Route as ApiPublicLinkedinCallbackRouteImport } from './routes/api/public/linkedin/callback'
-import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
 import { Route as ApiPublicHooksAutopilotRouteImport } from './routes/api/public/hooks/autopilot'
+import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
+import { Route as ApiPublicLinkedinCallbackRouteImport } from './routes/api/public/linkedin/callback'
+import { Route as ApiPublicLinkedinLoginRouteImport } from './routes/api/public/linkedin/login'
+import { Route as ApiPublicLinkedinLogoutRouteImport } from './routes/api/public/linkedin/logout'
 
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -32,31 +32,31 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ApiPublicLinkedinLogoutRoute = ApiPublicLinkedinLogoutRouteImport.update({
-  id: '/api/public/linkedin/logout',
-  path: '/api/public/linkedin/logout',
+const ApiPublicHooksAutopilotRoute = ApiPublicHooksAutopilotRouteImport.update({
+  id: '/api/public/hooks/autopilot',
+  path: '/api/public/hooks/autopilot',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicLinkedinLoginRoute = ApiPublicLinkedinLoginRouteImport.update({
-  id: '/api/public/linkedin/login',
-  path: '/api/public/linkedin/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicLinkedinCallbackRoute =
-  ApiPublicLinkedinCallbackRouteImport.update({
-    id: '/api/public/linkedin/callback',
-    path: '/api/public/linkedin/callback',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicHooksPublishScheduledRoute =
   ApiPublicHooksPublishScheduledRouteImport.update({
     id: '/api/public/hooks/publish-scheduled',
     path: '/api/public/hooks/publish-scheduled',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksAutopilotRoute = ApiPublicHooksAutopilotRouteImport.update({
-  id: '/api/public/hooks/autopilot',
-  path: '/api/public/hooks/autopilot',
+const ApiPublicLinkedinCallbackRoute =
+  ApiPublicLinkedinCallbackRouteImport.update({
+    id: '/api/public/linkedin/callback',
+    path: '/api/public/linkedin/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicLinkedinLoginRoute = ApiPublicLinkedinLoginRouteImport.update({
+  id: '/api/public/linkedin/login',
+  path: '/api/public/linkedin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicLinkedinLogoutRoute = ApiPublicLinkedinLogoutRouteImport.update({
+  id: '/api/public/linkedin/logout',
+  path: '/api/public/linkedin/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -132,18 +132,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -153,25 +153,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/public/linkedin/logout': {
-      id: '/api/public/linkedin/logout'
-      path: '/api/public/linkedin/logout'
-      fullPath: '/api/public/linkedin/logout'
-      preLoaderRoute: typeof ApiPublicLinkedinLogoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/linkedin/login': {
-      id: '/api/public/linkedin/login'
-      path: '/api/public/linkedin/login'
-      fullPath: '/api/public/linkedin/login'
-      preLoaderRoute: typeof ApiPublicLinkedinLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/linkedin/callback': {
-      id: '/api/public/linkedin/callback'
-      path: '/api/public/linkedin/callback'
-      fullPath: '/api/public/linkedin/callback'
-      preLoaderRoute: typeof ApiPublicLinkedinCallbackRouteImport
+    '/api/public/hooks/autopilot': {
+      id: '/api/public/hooks/autopilot'
+      path: '/api/public/hooks/autopilot'
+      fullPath: '/api/public/hooks/autopilot'
+      preLoaderRoute: typeof ApiPublicHooksAutopilotRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/publish-scheduled': {
@@ -181,11 +167,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishScheduledRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/autopilot': {
-      id: '/api/public/hooks/autopilot'
-      path: '/api/public/hooks/autopilot'
-      fullPath: '/api/public/hooks/autopilot'
-      preLoaderRoute: typeof ApiPublicHooksAutopilotRouteImport
+    '/api/public/linkedin/callback': {
+      id: '/api/public/linkedin/callback'
+      path: '/api/public/linkedin/callback'
+      fullPath: '/api/public/linkedin/callback'
+      preLoaderRoute: typeof ApiPublicLinkedinCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/linkedin/login': {
+      id: '/api/public/linkedin/login'
+      path: '/api/public/linkedin/login'
+      fullPath: '/api/public/linkedin/login'
+      preLoaderRoute: typeof ApiPublicLinkedinLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/linkedin/logout': {
+      id: '/api/public/linkedin/logout'
+      path: '/api/public/linkedin/logout'
+      fullPath: '/api/public/linkedin/logout'
+      preLoaderRoute: typeof ApiPublicLinkedinLogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
