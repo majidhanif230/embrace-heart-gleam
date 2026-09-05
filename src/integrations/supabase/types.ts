@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      autopilot: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          interval_hours: number
+          last_error: string | null
+          last_run_at: string | null
+          last_topic: string | null
+          next_run_at: string
+          niche: string
+          paused_reason: string | null
+          style: string
+          target_chars: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          interval_hours?: number
+          last_error?: string | null
+          last_run_at?: string | null
+          last_topic?: string | null
+          next_run_at?: string
+          niche?: string
+          paused_reason?: string | null
+          style?: string
+          target_chars?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          interval_hours?: number
+          last_error?: string | null
+          last_run_at?: string | null
+          last_topic?: string | null
+          next_run_at?: string
+          niche?: string
+          paused_reason?: string | null
+          style?: string
+          target_chars?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       drafts: {
         Row: {
           content: string
@@ -26,6 +74,7 @@ export type Database = {
           post_id: string | null
           published_at: string | null
           scheduled_for: string | null
+          source: string
           status: string
           style: string
           target_chars: number
@@ -44,6 +93,7 @@ export type Database = {
           post_id?: string | null
           published_at?: string | null
           scheduled_for?: string | null
+          source?: string
           status?: string
           style?: string
           target_chars?: number
@@ -62,12 +112,28 @@ export type Database = {
           post_id?: string | null
           published_at?: string | null
           scheduled_for?: string | null
+          source?: string
           status?: string
           style?: string
           target_chars?: number
           topic?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      job_locks: {
+        Row: {
+          locked_until: string
+          name: string
+        }
+        Insert: {
+          locked_until: string
+          name: string
+        }
+        Update: {
+          locked_until?: string
+          name?: string
         }
         Relationships: []
       }
@@ -169,7 +235,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      acquire_job_lock: {
+        Args: { _name: string; _seconds: number }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
