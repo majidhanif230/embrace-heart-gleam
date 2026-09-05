@@ -28,6 +28,12 @@ import {
   cancelSchedule,
 } from "@/lib/drafts.functions";
 import { getSessionUser } from "@/lib/linkedin-auth.functions";
+import {
+  getAutopilot,
+  saveAutopilot,
+  runAutopilotNow,
+  previewTrending,
+} from "@/lib/autopilot.functions";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -187,6 +193,7 @@ function Studio() {
   const [userLabel, setUserLabel] = useState<string>("");
   const [voiceNotes, setVoiceNotes] = useState("");
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [autopilotOpen, setAutopilotOpen] = useState(false);
 
   const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
@@ -565,6 +572,9 @@ function Studio() {
             </button>
             <button onClick={() => setKnowledgeOpen(true)} className="rounded-lg px-3 py-1.5 font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground">
               Knowledge{knowledge.length ? <span className="ml-1 rounded-full gradient-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{knowledge.length}</span> : ""}
+            </button>
+            <button onClick={() => setAutopilotOpen(true)} className="rounded-lg px-3 py-1.5 font-semibold text-accent transition hover:bg-white/5">
+              ⚡ Autopilot
             </button>
             <button onClick={onNewDraft} className="rounded-lg px-3 py-1.5 font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground">
               + New
@@ -1066,6 +1076,215 @@ function Studio() {
           </div>
         </div>
       )}
+
+      {autopilotOpen && <AutopilotModal onClose={() => { setAutopilotOpen(false); refreshDrafts(); }} />}
+    </div>
+  );
+}
+
+type AutopilotSettings = {
+  enabled: boolean;
+  interval_hours: number;
+  niche: string;
+  style: string;
+  target_chars: number;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  last_topic: string | null;
+  last_error: string | null;
+  paused_reason: string | null;
+};
+
+function AutopilotModal({ onClose }: { onClose: () => void }) {
+  const [s, setS] = useState<AutopilotSettings | null>(null);
+  const [headlines, setHeadlines] = useState<string[]>([]);
+  const [busy, setBusy] = useState<null | "saving" | "running" | "trending">(null);
+  const [msg, setMsg] = useState<string>("");
+
+  useEffect(() => {
+    getAutopilot()
+      .then((r) => setS(r.settings as AutopilotSettings))
+      .catch((e) => setMsg(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  const update = (patch: Partial<AutopilotSettings>) => setS((prev) => (prev ? { ...prev, ...patch } : prev));
+
+  const persist = async (enabled: boolean) => {
+    if (!s) return;
+    setBusy("saving");
+    setMsg("");
+    try {
+      await saveAutopilot({
+        data: {
+          enabled,
+          interval_hours: s.interval_hours,
+          niche: s.niche,
+          style: s.style,
+          target_chars: s.target_chars,
+        },
+      });
+      update({ enabled, paused_reason: null, last_error: null });
+      setMsg(enabled ? `Autopilot is on — a new post goes out every ${s.interval_hours} hours.` : "Autopilot is off.");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onTrending = async () => {
+    if (!s) return;
+    setBusy("trending");
+    setMsg("");
+    try {
+      const r = await previewTrending({ data: { niche: s.niche } });
+      setHeadlines(r.headlines);
+      if (!r.headlines.length) setMsg("No trending stories found for that focus — try broader keywords.");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onRunNow = async () => {
+    setBusy("running");
+    setMsg("");
+    try {
+      const r = await runAutopilotNow();
+      setMsg(`Posted: ${r.topic}`);
+      const fresh = await getAutopilot();
+      setS(fresh.settings as AutopilotSettings);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+      <div className="glass-strong my-8 w-full max-w-2xl rounded-3xl p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-xl font-bold">⚡ Autopilot</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Finds a trending story in your niche, writes a post in your voice, and publishes it automatically.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">Close</button>
+        </div>
+
+        {!s ? (
+          <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
+        ) : (
+          <div className="mt-6 space-y-5">
+            <div className={`flex items-center justify-between rounded-2xl border p-4 ${s.enabled ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-white/5"}`}>
+              <div>
+                <p className="text-sm font-semibold">{s.enabled ? "Autopilot is ON" : "Autopilot is OFF"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {s.enabled
+                    ? `Next post around ${s.next_run_at ? new Date(s.next_run_at).toLocaleString() : "soon"}`
+                    : "Turn it on to start automatic posting."}
+                </p>
+              </div>
+              <button
+                onClick={() => persist(!s.enabled)}
+                disabled={busy !== null}
+                className={`rounded-xl px-5 py-2.5 text-xs font-semibold uppercase tracking-widest transition disabled:opacity-40 ${s.enabled ? "border border-destructive/60 text-destructive hover:bg-destructive/10" : "gradient-viral text-white hover:brightness-110"}`}
+              >
+                {busy === "saving" ? "Saving…" : s.enabled ? "Turn off" : "Turn on"}
+              </button>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Label htmlFor="ap-niche">What should it post about?</Label>
+                <input
+                  id="ap-niche" type="text" value={s.niche}
+                  onChange={(e) => update({ niche: e.target.value })}
+                  placeholder="e.g. AI startups, fintech, product design"
+                  className="w-full rounded-xl border border-border bg-background/40 px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">Leave empty for general tech, AI and business news.</p>
+              </div>
+
+              <div>
+                <Label htmlFor="ap-interval">Post every</Label>
+                <select
+                  id="ap-interval" value={s.interval_hours}
+                  onChange={(e) => update({ interval_hours: Number(e.target.value) })}
+                  className="w-full rounded-xl border border-border bg-background/40 px-4 py-3 text-sm focus:border-primary focus:outline-none"
+                >
+                  {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => (
+                    <option key={h} value={h}>{h} hour{h > 1 ? "s" : ""}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="ap-style">Writing style</Label>
+                <select
+                  id="ap-style" value={s.style}
+                  onChange={(e) => update({ style: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-background/40 px-4 py-3 text-sm focus:border-primary focus:outline-none"
+                >
+                  {["professional", "viral-creator", "storytelling", "educational", "founder", "personal-experience", "technical-deep-dive", "case-study"].map((k) => (
+                    <option key={k} value={k}>{k.replace(/-/g, " ")}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <Label htmlFor="ap-len">Post length · {s.target_chars} characters</Label>
+                <input
+                  id="ap-len" type="range" min={300} max={3000} step={100}
+                  value={s.target_chars}
+                  onChange={(e) => update({ target_chars: Number(e.target.value) })}
+                  className="w-full accent-primary"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => persist(s.enabled)} disabled={busy !== null}
+                className="rounded-xl gradient-primary px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground transition hover:brightness-110 disabled:opacity-40">
+                {busy === "saving" ? "Saving…" : "Save settings"}
+              </button>
+              <button onClick={onTrending} disabled={busy !== null}
+                className="rounded-xl border border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground transition hover:border-primary hover:text-foreground disabled:opacity-40">
+                {busy === "trending" ? "Loading…" : "Show trending now"}
+              </button>
+              <button onClick={onRunNow} disabled={busy !== null}
+                className="rounded-xl gradient-viral px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition hover:brightness-110 disabled:opacity-40">
+                {busy === "running" ? "Writing & posting…" : "Post one now"}
+              </button>
+            </div>
+
+            {msg && <p className="rounded-xl bg-white/5 px-4 py-3 text-xs break-words">{msg}</p>}
+            {s.paused_reason && (
+              <p className="rounded-xl bg-destructive/15 px-4 py-3 text-xs text-destructive">
+                Paused: {s.paused_reason} — fix it, then turn Autopilot back on.
+              </p>
+            )}
+            {s.last_topic && (
+              <p className="text-xs text-muted-foreground">
+                Last posted: <span className="text-foreground">{s.last_topic}</span>
+                {s.last_run_at ? ` · ${new Date(s.last_run_at).toLocaleString()}` : ""}
+              </p>
+            )}
+
+            {headlines.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Trending right now</p>
+                {headlines.map((h) => (
+                  <p key={h} className="rounded-xl border border-border bg-white/5 px-3 py-2 text-xs">{h}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
